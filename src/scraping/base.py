@@ -7,6 +7,8 @@ import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from src.config import data_dir as _data_dir
+
 
 @dataclass
 class ProductRecord:
@@ -69,4 +71,14 @@ class BaseScraper:
         data = [r.to_dict() for r in records]
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
+
+        # Upload to MinIO when configured — silent no-op if unavailable
+        from src.storage.minio_client import is_minio_configured, upload_file
+        if is_minio_configured():
+            try:
+                key = str(path.relative_to(_data_dir()))
+            except ValueError:
+                key = path.name
+            upload_file(path, bucket="raw-data", key=key)
+
         return path
