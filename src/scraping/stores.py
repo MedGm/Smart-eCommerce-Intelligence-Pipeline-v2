@@ -21,9 +21,4 @@ def load_stores(path: Path | None = None) -> tuple[list[dict], list[dict]]:
     return shopify, woocommerce
 
 
-# Backwards-compatible exports for any code that imports these directly.
-def _lazy_load():
-    s, w = load_stores()
-    return s, w
-
-SHOPIFY_STORES, WOOCOMMERCE_STORES = _lazy_load()
+SHOPIFY_STORES, WOOCOMMERCE_STORES = load_stores()
