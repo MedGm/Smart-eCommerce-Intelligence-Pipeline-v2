@@ -20,8 +20,8 @@ def validate_required(df: pd.DataFrame, required: list[str] | None = None) -> pd
 
     out = df.copy()
     for col in required:
-        if out[col].dtype == object:
-            out[col] = out[col].fillna("").astype(str).str.strip().replace("", pd.NA)
+        stripped = out[col].fillna("").astype(str).str.strip()
+        out[col] = stripped.where(stripped != "")
 
     before = len(df)
     out = out.dropna(subset=required)
