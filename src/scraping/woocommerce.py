@@ -11,20 +11,20 @@ Dossier tools: requests, BeautifulSoup, WooCommerce REST API.
 
 from __future__ import annotations
 
-import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
 
+from src.config import get_logger
 from src.scraping.base import BaseScraper, ProductRecord
 from src.scraping.html_fallback import (
     extract_product_fields_from_html,
     extract_woocommerce_taxonomy_from_html,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class WooCommerceScraper(BaseScraper):
@@ -36,8 +36,9 @@ class WooCommerceScraper(BaseScraper):
         site_url: str = "",
         shop_name: str = "Unknown",
         geography: str | None = None,
+        run_id: str | None = None,
     ):
-        super().__init__(output_dir)
+        super().__init__(output_dir, run_id=run_id)
         self.site_url = site_url.rstrip("/")
         self.shop_name = shop_name
         self.geography = geography
@@ -157,6 +158,36 @@ class WooCommerceScraper(BaseScraper):
             "taxonomy_evidence_strength": strength,
         }
 
+    def _session_get_with_retry(
+        self, url: str, max_retries: int = 3, backoff_base: float = 1.5, **kwargs
+    ):
+        import time
+
+        for attempt in range(max_retries):
+            try:
+                resp = self.session.get(url, **kwargs)
+                if resp.status_code in (429, 503):
+                    if attempt < max_retries - 1:
+                        wait = backoff_base**attempt
+                        logger.warning(
+                            "HTTP %d from %s, retry %d/%d in %.1fs",
+                            resp.status_code,
+                            url,
+                            attempt + 1,
+                            max_retries,
+                            wait,
+                        )
+                        time.sleep(wait)
+                    continue
+                return resp
+            except requests.RequestException as exc:
+                logger.warning("Request failed %s: %s (attempt %d)", url, exc, attempt + 1)
+                if attempt < max_retries - 1:
+                    import time as _t
+
+                    _t.sleep(backoff_base**attempt)
+        return None
+
     def _strip_html(self, text: str) -> str:
         """Remove HTML tags from description text."""
         if not text:
@@ -169,12 +200,9 @@ class WooCommerceScraper(BaseScraper):
         """Fetch raw HTML from a product permalink for taxonomy enrichment."""
         if not url:
             return None
-        try:
-            resp = self.session.get(url, timeout=15)
-            if resp.status_code == 200:
-                return resp.text
-        except requests.RequestException as exc:
-            logger.debug("HTML fetch failed for %s: %s", url, exc)
+        resp = self._session_get_with_retry(url, timeout=15)
+        if resp is not None and resp.status_code == 200:
+            return resp.text
         return None
 
     def _enrich_from_html(self, product_url: str, product_title: str | None = None) -> dict:
@@ -267,14 +295,17 @@ class WooCommerceScraper(BaseScraper):
 
         for page in range(1, max_pages + 1):
             url = self._api_url(per_page=per_page, page=page)
-            try:
-                resp = self.session.get(url, timeout=15)
-            except requests.RequestException as exc:
-                logger.warning("  [%s] Error on page %d: %s", self.shop_name, page, exc)
+            resp = self._session_get_with_retry(url, timeout=15)
+            if resp is None:
+                logger.warning(
+                    "  [%s] Page %d failed after retries, stopping.", self.shop_name, page
+                )
                 break
 
             if resp.status_code != 200:
-                logger.warning("  [%s] Page %d status %d, stopping.", self.shop_name, page, resp.status_code)
+                logger.warning(
+                    "  [%s] Page %d status %d, stopping.", self.shop_name, page, resp.status_code
+                )
                 break
 
             try:
@@ -359,7 +390,13 @@ class WooCommerceScraper(BaseScraper):
                 )
                 records.append(record)
 
-            logger.info("  [%s] Page %d: %d items (total: %d)", self.shop_name, page, len(data), len(records))
+            logger.info(
+                "  [%s] Page %d: %d items (total: %d)",
+                self.shop_name,
+                page,
+                len(data),
+                len(records),
+            )
             if len(data) < per_page:
                 break
 

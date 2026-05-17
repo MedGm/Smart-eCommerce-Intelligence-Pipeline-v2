@@ -48,16 +48,24 @@ class ProductRecord:
 class BaseScraper:
     """Base class for Shopify and WooCommerce adapters."""
 
-    def __init__(self, output_dir: Path):
+    def __init__(self, output_dir: Path, run_id: str | None = None):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.run_id = run_id
 
     def scrape(self) -> list[ProductRecord]:
         """Override: fetch products and return list of ProductRecord."""
         raise NotImplementedError
 
     def save(self, records: list[ProductRecord], filename: str = "products.json") -> Path:
-        path = self.output_dir / filename
+        if self.run_id:
+            stem = Path(filename).stem        # "ruggable"
+            suffix = Path(filename).suffix    # ".json"
+            dest_dir = self.output_dir / stem
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            path = dest_dir / f"{self.run_id}{suffix}"
+        else:
+            path = self.output_dir / filename
         data = [r.to_dict() for r in records]
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)

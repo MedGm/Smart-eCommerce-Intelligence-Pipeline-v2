@@ -25,8 +25,9 @@ class WorkerAgent:
     correct scraper (Shopify/WooCommerce), and executes the extraction.
     """
 
-    def __init__(self, agent_id: str):
+    def __init__(self, agent_id: str, run_id: str | None = None):
         self.agent_id = agent_id
+        self.run_id = run_id
         self.raw_dir = data_dir() / "raw"
         self.raw_dir.mkdir(parents=True, exist_ok=True)
 
@@ -49,6 +50,7 @@ class WorkerAgent:
                     geography=store.get("geography"),
                     collections=store.get("collections", ["all"]),
                     max_collection_pages=store.get("max_collection_pages", 20),
+                    run_id=self.run_id,
                 )
                 records = scraper.scrape()
                 if records:
@@ -63,6 +65,7 @@ class WorkerAgent:
                     site_url=store["url"],
                     shop_name=store["name"],
                     geography=store.get("geography"),
+                    run_id=self.run_id,
                 )
                 records = scraper.scrape()
                 if records:
@@ -82,8 +85,9 @@ class CoordinatorAgent:
     concurrently to execute the plan.
     """
 
-    def __init__(self, max_workers: int = 3):
+    def __init__(self, max_workers: int = 3, run_id: str | None = None):
         self.max_workers = max_workers
+        self.run_id = run_id
 
     def plan_distribution(
         self, shopify_stores: list[dict], wc_stores: list[dict]
@@ -121,7 +125,7 @@ class CoordinatorAgent:
             for worker_id, tasks in distribution_plan.items():
                 if not tasks:
                     continue
-                agent = WorkerAgent(agent_id=worker_id)
+                agent = WorkerAgent(agent_id=worker_id, run_id=self.run_id)
                 future = executor.submit(agent.execute_batch, tasks)
                 future_to_worker[future] = worker_id
 
@@ -149,11 +153,23 @@ class CoordinatorAgent:
         # Shopify
         shopify_records = [r.to_dict() for r in records if r.source_platform == "shopify"]
         if shopify_records:
-            with open(raw_dir / "shopify" / "products.json", "w", encoding="utf-8") as f:
+            if self.run_id:
+                shopify_agg_dir = raw_dir / "shopify" / self.run_id
+                shopify_agg_dir.mkdir(parents=True, exist_ok=True)
+                agg_path = shopify_agg_dir / "products.json"
+            else:
+                agg_path = raw_dir / "shopify" / "products.json"
+            with open(agg_path, "w", encoding="utf-8") as f:
                 json.dump(shopify_records, f, indent=2, ensure_ascii=False)
 
         # WooCommerce
         wc_records = [r.to_dict() for r in records if r.source_platform == "woocommerce"]
         if wc_records:
-            with open(raw_dir / "woocommerce" / "products.json", "w", encoding="utf-8") as f:
+            if self.run_id:
+                wc_agg_dir = raw_dir / "woocommerce" / self.run_id
+                wc_agg_dir.mkdir(parents=True, exist_ok=True)
+                agg_path = wc_agg_dir / "products.json"
+            else:
+                agg_path = raw_dir / "woocommerce" / "products.json"
+            with open(agg_path, "w", encoding="utf-8") as f:
                 json.dump(wc_records, f, indent=2, ensure_ascii=False)

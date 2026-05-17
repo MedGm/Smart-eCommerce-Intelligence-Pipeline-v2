@@ -5,6 +5,7 @@ Orchestrator: run all Shopify and WooCommerce scrapers using the A2A Coordinator
 from __future__ import annotations
 
 import sys
+from datetime import datetime, timezone
 
 from src.config import get_logger
 from src.scraping.agents import CoordinatorAgent
@@ -14,9 +15,11 @@ logger = get_logger(__name__)
 
 
 def run():
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    logger.info("Run ID: %s", run_id)
     logger.info("Initializing A2A Scraping Coordinator.")
     shopify_stores, woocommerce_stores = load_stores()
-    coordinator = CoordinatorAgent(max_workers=3)
+    coordinator = CoordinatorAgent(max_workers=3, run_id=run_id)
     logger.info(
         f"Targeting {len(shopify_stores)} Shopify stores and {len(woocommerce_stores)} WooCommerce stores."
     )

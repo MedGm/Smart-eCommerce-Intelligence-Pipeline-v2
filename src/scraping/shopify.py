@@ -39,8 +39,9 @@ class ShopifyScraper(BaseScraper):
         geography: str | None = None,
         collections: list[str] | None = None,
         max_collection_pages: int = 20,
+        run_id: str | None = None,
     ):
-        super().__init__(output_dir)
+        super().__init__(output_dir, run_id=run_id)
         self.store_url = store_url.rstrip("/")
         self.shop_name = shop_name
         self.geography = geography
@@ -117,7 +118,9 @@ class ShopifyScraper(BaseScraper):
             from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
             from playwright.sync_api import sync_playwright
         except ImportError:
-            self.logger.warning("  [%s] Playwright not installed, skipping dynamic scraping.", self.shop_name)
+            self.logger.warning(
+                "  [%s] Playwright not installed, skipping dynamic scraping.", self.shop_name
+            )
             return []
 
         results = []
@@ -397,25 +400,28 @@ class ShopifyScraper(BaseScraper):
             category_leaf_raw=taxonomy["category_leaf_raw"],
         )
 
-    def _get_with_retry(
-        self, url: str, max_retries: int = 3, backoff_base: float = 1.5, **kwargs
-    ):
+    def _get_with_retry(self, url: str, max_retries: int = 3, backoff_base: float = 1.5, **kwargs):
         for attempt in range(max_retries):
             try:
                 resp = requests.get(url, **kwargs)
                 if resp.status_code in (429, 503):
-                    wait = backoff_base ** attempt
-                    self.logger.warning(
-                        "HTTP %d from %s, retry %d/%d in %.1fs",
-                        resp.status_code, url, attempt + 1, max_retries, wait,
-                    )
-                    time.sleep(wait)
+                    if attempt < max_retries - 1:
+                        wait = backoff_base**attempt
+                        self.logger.warning(
+                            "HTTP %d from %s, retry %d/%d in %.1fs",
+                            resp.status_code,
+                            url,
+                            attempt + 1,
+                            max_retries,
+                            wait,
+                        )
+                        time.sleep(wait)
                     continue
                 return resp
             except requests.RequestException as exc:
                 self.logger.warning("Request failed %s: %s (attempt %d)", url, exc, attempt + 1)
                 if attempt < max_retries - 1:
-                    time.sleep(backoff_base ** attempt)
+                    time.sleep(backoff_base**attempt)
         return None
 
     def scrape(self) -> list[ProductRecord]:
@@ -428,7 +434,9 @@ class ShopifyScraper(BaseScraper):
         records: list[ProductRecord] = []
 
         slug_info_json = self._extract_product_slugs_json_listing()
-        slug_info_playwright = self._extract_product_slugs_playwright() if not slug_info_json else []
+        slug_info_playwright = (
+            self._extract_product_slugs_playwright() if not slug_info_json else []
+        )
 
         # Merge JSON-listing + Playwright discoveries while preserving first-seen order.
         slug_info: list[dict] = []
@@ -440,7 +448,9 @@ class ShopifyScraper(BaseScraper):
             seen_slugs.add(slug)
             slug_info.append(info)
 
-        self.logger.info("  [%s] Collected %d product slugs, enriching...", self.shop_name, len(slug_info))
+        self.logger.info(
+            "  [%s] Collected %d product slugs, enriching...", self.shop_name, len(slug_info)
+        )
 
         for i, info in enumerate(slug_info):
             slug = info["slug"]
@@ -537,7 +547,9 @@ class ShopifyScraper(BaseScraper):
                     records.append(record)
 
             if (i + 1) % 20 == 0:
-                self.logger.info("  [%s] Enriched %d/%d products", self.shop_name, i + 1, len(slug_info))
+                self.logger.info(
+                    "  [%s] Enriched %d/%d products", self.shop_name, i + 1, len(slug_info)
+                )
             time.sleep(SCRAPING_DELAY)
 
         self.logger.info("ShopifyScraper: %s done — %d products", self.shop_name, len(records))
