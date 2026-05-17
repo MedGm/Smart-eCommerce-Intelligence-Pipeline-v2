@@ -16,23 +16,32 @@ _IMAGE = "smart-ecommerce-pipeline-v2-app:latest"
 
 
 @dsl.component(base_image=_IMAGE)
-def preprocess_op(data_dir: str):
+def preprocess_op(
+    data_dir: str,
+    processed: dsl.Output[dsl.Dataset],
+):
     import os
 
     os.environ["DATA_DIR"] = data_dir
     from src.preprocessing.run import run
 
     run()
+    processed.metadata["data_dir"] = data_dir
 
 
 @dsl.component(base_image=_IMAGE)
-def features_op(data_dir: str):
+def features_op(
+    data_dir: str,
+    processed: dsl.Input[dsl.Dataset],
+    features: dsl.Output[dsl.Dataset],
+):
     import os
 
     os.environ["DATA_DIR"] = data_dir
     from src.features.build_features import run
 
     run()
+    features.metadata["data_dir"] = data_dir
 
 
 @dsl.component(base_image=_IMAGE)
@@ -111,8 +120,7 @@ def smart_ecommerce_pipeline(data_dir: str = "/app/data"):
     )
 
     f = (
-        features_op(data_dir=data_dir)
-        .after(p)
+        features_op(data_dir=data_dir, processed=p.outputs["processed"])
         .set_caching_options(enable_caching=True)
         .set_retry(num_retries=2)
     )
