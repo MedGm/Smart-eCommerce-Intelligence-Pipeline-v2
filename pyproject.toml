@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "smart-ecommerce-pipeline"
+version = "0.2.0"
+description = "Smart eCommerce Intelligence Pipeline for Top-K Product Selection"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Academic Use"}
+authors = [
+    {name = "Mohamed"},
+    {name = "Ismail"},
+]
+
+[project.scripts]
+pipeline = "src.pipeline.local_pipeline:run"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"

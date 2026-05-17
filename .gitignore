@@ -1,0 +1,59 @@
+# Data (keep structure via .gitkeep)
+data/raw/**/*.json
+data/processed/*.parquet
+data/processed/*.csv
+data/analytics/*.csv
+data/analytics/*.json
+data/analytics/*.jsonl
+data/analytics/*.png
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/analytics/.gitkeep
+
+# Env and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# IDE and OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Test and lint
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+
+# Notebooks
+notebooks/.ipynb_checkpoints/
+
+# Logs
+*.log
+logs/
+
+# Generated pipeline artifacts
+kubeflow_smart_ecommerce_pipeline.yaml
+
+# Validator output (keep candidates list, ignore results)
+scripts/target_results.csv
+scripts/target_results_v2.csv
+
+
+
+data/models/

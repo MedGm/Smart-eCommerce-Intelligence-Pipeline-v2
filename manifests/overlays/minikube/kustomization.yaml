@@ -1,0 +1,68 @@
+# manifests/overlays/minikube/kustomization.yaml
+#
+# PERMANENT KUSTOMIZE OVERLAY — Namespace-scoped KFP workloads
+#
+# Problem
+# -------
+# KFP v2.4.1 manifests reference images from gcr.io/ml-pipeline/*.
+# Google shut down that registry. This overlay patches ALL broken image
+# references before any resource reaches the cluster.
+#
+# Image lineage (verified)
+# ────────────────────────
+# The KFP argo patch layer overrides the upstream quay.io/argoproj images
+# with gcr.io/ml-pipeline variants. Our overlay restores the correct source:
+#
+#   gcr.io/ml-pipeline/minio:*                 → minio/minio:* (Docker Hub)
+#   gcr.io/ml-pipeline/mysql:*                 → mysql:* (Docker Hub)
+#   gcr.io/ml-pipeline/workflow-controller:*   → quay.io/argoproj/workflow-controller:v3.4.17
+#   gcr.io/ml-pipeline/argoexec:*              → quay.io/argoproj/argoexec:v3.4.17
+#
+# How to deploy (from project root)
+# ----------------------------------
+#   kubectl apply -k manifests/overlays/minikube/cluster-scoped/
+#   kubectl wait --for condition=established --timeout=60s crd/applications.app.k8s.io
+#   kubectl apply -k manifests/overlays/minikube/
+#
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Base: upstream KFP platform-agnostic env (checked in at manifests/kfp-upstream/)
+resources:
+  - ../../kfp-upstream/env/platform-agnostic
+
+# Image substitutions
+images:
+
+  # 1. MinIO — artifact object store
+  - name: gcr.io/ml-pipeline/minio
+    newName: minio/minio
+    newTag: "RELEASE.2019-08-14T20-37-41Z"
+
+  # 2. MySQL — pipeline metadata database
+  - name: gcr.io/ml-pipeline/mysql
+    newName: mysql
+    newTag: "8.0.26"
+
+  # 3. Argo Workflow Controller
+  #    Source: quay.io/argoproj/workflow-controller (official Argo OSS registry)
+  #    KFP's argo patch layer overwrites this to gcr.io/ml-pipeline/workflow-controller:v3.4.17-license-compliance
+  - name: gcr.io/ml-pipeline/workflow-controller
+    newName: quay.io/argoproj/workflow-controller
+    newTag: "v3.4.17"
+
+  # 4. Argo Executor — injected as init container into every pipeline run pod
+  #    Source: quay.io/argoproj/argoexec (official Argo OSS registry)
+  - name: gcr.io/ml-pipeline/argoexec
+    newName: quay.io/argoproj/argoexec
+    newTag: "v3.4.17"
+
+# Strategic merge patches
+# The 'images' directive can only patch container image: fields.
+# The workflow-controller also passes --executor-image as a CLI arg string,
+# which requires an explicit strategic merge patch.
+patches:
+  - path: workflow-controller-args-patch.yaml
+    target:
+      kind: Deployment
+      name: workflow-controller

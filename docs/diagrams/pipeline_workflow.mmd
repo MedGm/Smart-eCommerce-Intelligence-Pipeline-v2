@@ -1,0 +1,64 @@
+flowchart TD
+    A["Start Pipeline Run"] --> B["Scraping Stage"]
+
+    subgraph SCR["1) Scraping"]
+        B1["A2A Plan Distribution"] --> B2["Shopify + Woo Workers"]
+        B2 --> B3["Taxonomy Evidence Capture\nJSON-LD / breadcrumb / Woo meta"]
+        B3 --> B4["Write raw product JSON"]
+    end
+
+    B --> SCR
+    SCR --> C["Preprocessing Stage"]
+
+    subgraph PRE["2) Preprocessing"]
+        C1["Dedup + URL canonicalization"] --> C2["Price/Rating parsing"]
+        C2 --> C3["Category normalization\n(path-aware + alias map)"]
+        C3 --> C4["Validation + status columns\n(found/missing/extraction_failed)"]
+        C4 --> C5["DQ counters + failure samples"]
+        C5 --> C6["cleaned_products.parquet"]
+    end
+
+    C --> PRE
+    PRE --> D["Feature Engineering"]
+
+    subgraph FE["3) Features"]
+        D1["Build model/scoring features"] --> D2["features.parquet"]
+    end
+
+    D --> FE
+    FE --> E["Scoring"]
+
+    subgraph SC["4) Scoring"]
+        E1["Compute explainable score"] --> E2["topk_products.csv"]
+        E1 --> E3["topk_per_category.csv"]
+        E1 --> E4["topk_per_shop.csv"]
+    end
+
+    E --> SC
+    SC --> F["Modeling + Mining"]
+
+    subgraph MM["5) ML + Mining"]
+        F1["Train RF + XGBoost"] --> F2["model_metrics*.json"]
+        F3["KMeans + DBSCAN"] --> F4["clusters.csv + pca_viz.csv + dbscan_clusters.csv"]
+        F5["Apriori Association Rules"] --> F6["association_rules.csv"]
+    end
+
+    F --> MM
+    MM --> G["LLM Summary Stage"]
+
+    subgraph LLM["6) LLM + MCP"]
+        G1["Read-only analytics access (MCP)"] --> G2["Executive summary + strategy + chat"]
+        G2 --> G3["llm_usage_log.jsonl + mcp_access_log.jsonl"]
+    end
+
+    G --> LLM
+    LLM --> H["Dashboard + Audit Replay"]
+
+    subgraph QA["7) QA + Audit"]
+        H1["Streamlit BI views"]
+        H2["20-row replay audit delta"]
+        H3["Root-cause trend tracking"]
+    end
+
+    H --> QA
+    QA --> Z["End Pipeline Run"]

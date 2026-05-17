@@ -1,0 +1,70 @@
+flowchart LR
+    subgraph DataSources["Data Sources"]
+        S1["Shopify Stores"]
+        S2["WooCommerce Stores"]
+    end
+
+    subgraph Ingestion["Ingestion Layer"]
+        A2A["A2A Coordinator + Workers\nsrc/scraping/agents.py"]
+        SH["Shopify Scraper"]
+        WC["WooCommerce Scraper"]
+        HF["HTML Taxonomy Fallback\n(JSON-LD + Breadcrumb + Woo cascade)"]
+    end
+
+    subgraph Storage["Data Storage"]
+        RAW["data/raw/*.json"]
+        PROC["data/processed/*.parquet"]
+        AN["data/analytics/*.csv|json"]
+    end
+
+    subgraph ML["ML + Mining"]
+        FEAT["Feature Engineering"]
+        SCORE["Top-K Scoring"]
+        CLF["RF + XGBoost"]
+        CLUST["KMeans + DBSCAN"]
+        RULES["Association Rules"]
+    end
+
+    subgraph BI["BI + App Layer"]
+        DASH["Streamlit Dashboard\nsrc/dashboard/app.py"]
+        MCP["MCP Client/Servers\nread-only analytics access"]
+        LLM["Gemini Summaries + Chat"]
+    end
+
+    subgraph Ops["Ops + Orchestration"]
+        LOCAL["Local Pipeline\nsrc/pipeline/local_pipeline.py"]
+        KFP["Kubeflow Pipeline\nsrc/pipeline/kubeflow_pipeline.py"]
+        MINIKUBE["Minikube + KFP UI"]
+        AUDIT["20-row Audit Replay\nscripts/replay_audit.py"]
+    end
+
+    S1 --> A2A
+    S2 --> A2A
+    A2A --> SH
+    A2A --> WC
+    SH --> HF
+    WC --> HF
+    SH --> RAW
+    WC --> RAW
+
+    RAW --> LOCAL
+    LOCAL --> PROC
+    PROC --> FEAT
+    FEAT --> SCORE
+    FEAT --> CLF
+    FEAT --> CLUST
+    FEAT --> RULES
+    SCORE --> AN
+    CLF --> AN
+    CLUST --> AN
+    RULES --> AN
+
+    KFP --> MINIKUBE
+    KFP --> PROC
+    KFP --> AN
+
+    AN --> MCP
+    MCP --> DASH
+    MCP --> LLM
+    DASH --> AUDIT
+    AN --> AUDIT

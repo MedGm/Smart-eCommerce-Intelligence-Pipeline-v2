@@ -1,0 +1,40 @@
+# Smart eCommerce Intelligence Pipeline — dependencies
+# Python 3.10+ recommended
+
+# Scraping
+playwright>=1.40.0
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+
+# Data
+pandas>=2.0.0
+numpy>=1.24.0
+pyarrow>=14.0.0
+
+# ML / Data mining
+scikit-learn>=1.3.0
+xgboost>=2.0.0
+mlxtend>=0.23.0
+
+# Dashboard
+streamlit>=1.28.0
+plotly>=5.18.0
+altair>=5.0.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# LLM (Gemini / OpenAI-compatible)
+google-genai>=1.66.0
+langchain-google-genai>=4.0.0   # CoordinatorAgent LLM planner (Gemini via LangChain)
+# openai>=1.0.0          # optional: for OpenAI adapter
+
+# Pipeline / orchestration
+kfp>=2.4.0
+
+# Dev & CI
+pytest>=7.4.0
+pytest-cov>=4.1.0
+ruff>=0.1.0
+
+# Config
+python-dotenv>=1.0.0

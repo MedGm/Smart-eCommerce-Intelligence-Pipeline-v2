@@ -1,0 +1,52 @@
+# === Existing candidates ===
+# Shopify (existing)
+https://www.allbirds.com
+https://www.gymshark.com
+https://bombas.com
+https://www.brooklinen.com
+https://www.fashionnova.com
+https://colourpop.com
+https://ruggable.com
+https://www.stevemadden.com
+# WooCommerce (existing)
+https://porterandyork.com
+https://nalgene.com
+https://offermanwoodshop.com
+https://danosseasoning.com
+https://uppababy.com
+https://www.nutribullet.com
+https://gooddyeyoung.com
+https://lensdistortions.com
+
+# === New Shopify candidates ===
+# Fashion
+https://www.tentree.com
+https://rothys.com
+https://www.chubbiesshorts.com
+https://hiutdenim.co.uk
+# Beauty
+https://kyliecosmetics.com
+https://fentybeauty.com
+https://rarebeauty.com
+# Electronics/Gadgets
+https://www.popsockets.com
+https://www.mvmt.com
+https://www.turtlebeach.com
+https://www.case-mate.com
+# Home & Other
+https://grovemade.com
+https://www.luluandgeorgia.com
+https://www.leesa.com
+https://www.deathwishcoffee.com
+
+# === New WooCommerce candidates ===
+https://kikiandgreen.com
+https://burnywilds.com
+https://www.sodashi.com.au
+https://www.jococups.com
+https://magna-tiles.com
+https://pickybars.com
+https://www.dineamic.com.au
+https://www.henryjsocks.co.uk
+https://www.jmbullion.com
+https://www.reddbar.com

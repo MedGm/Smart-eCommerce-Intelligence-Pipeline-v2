@@ -1,0 +1,23 @@
+# manifests/overlays/minikube/workflow-controller-args-patch.yaml
+#
+# WHY THIS FILE EXISTS:
+# Kustomize's 'images' directive patches container 'image:' fields.
+# However, the workflow-controller also passes the argoexec image as a
+# --executor-image CLI argument string. This strategic merge patch overrides
+# that argument directly.
+#
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workflow-controller
+  namespace: kubeflow
+spec:
+  template:
+    spec:
+      containers:
+        - name: workflow-controller
+          args:
+            - --configmap
+            - workflow-controller-configmap
+            - --executor-image
+            - quay.io/argoproj/argoexec:v3.4.17

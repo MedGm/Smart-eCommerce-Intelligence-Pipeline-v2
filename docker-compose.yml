@@ -1,0 +1,23 @@
+# Smart eCommerce Intelligence Pipeline — Docker Compose
+# Use for reproducible run and demo. Pipeline runs in app service.
+
+services:
+  app:
+    build: .
+    volumes:
+      - ./data:/app/data
+    env_file: .env
+    command: ["python", "-m", "src.pipeline.local_pipeline"]
+    profiles:
+      - pipeline
+
+  dashboard:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+    env_file: .env
+    command: ["streamlit", "run", "src/dashboard/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    profiles:
+      - dashboard
