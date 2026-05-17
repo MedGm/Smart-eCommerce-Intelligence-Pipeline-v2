@@ -112,7 +112,8 @@ docker compose run --rm app ruff check src
 
 | Service | URL | Purpose |
 |---|---|---|
-| Streamlit | http://localhost:8501 | BI dashboard + LLM chat |
+| Streamlit | http://localhost:8501 | LLM chat interface (Synthesis + Chat) |
+| Superset | http://localhost:8088 | BI charts, rankings, product tables, clustering |
 | MinIO console | http://localhost:9001 | Browse raw/processed/model artifacts |
 | MinIO S3 API | http://localhost:9000 | S3-compatible endpoint |
 | MLflow | http://localhost:5000 | Experiment runs + model registry |

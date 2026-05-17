@@ -20,6 +20,7 @@ DOCKER_RUN = docker compose run --rm app
         scrape preprocess features score train pipeline \
         dashboard \
         infra-up infra-down \
+        superset-up superset-down \
         pipeline-full \
         warehouse dbt-run dbt-test \
         compile-kfp \
@@ -70,6 +71,12 @@ infra-up:
 
 infra-down:
 	docker compose --profile infra down
+
+superset-up:
+	docker compose --profile superset up -d
+
+superset-down:
+	docker compose --profile superset down
 
 # ── Full pipeline wired to infra ──────────────────────────────────────────────
 pipeline-full:
