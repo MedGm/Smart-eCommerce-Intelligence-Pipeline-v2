@@ -8,8 +8,11 @@ to avoid circular data leakage.
 """
 
 import json
+import os
 
 import joblib
+import mlflow
+import mlflow.xgboost as mlflow_xgb
 import pandas as pd
 from sklearn.metrics import (
     accuracy_score,
@@ -44,6 +47,11 @@ def run():
     if not HAS_XGBOOST:
         logger.warning("XGBoost not installed. pip install xgboost to enable.")
         return
+
+    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", "")
+    use_mlflow = bool(tracking_uri)
+    if use_mlflow:
+        mlflow.set_tracking_uri(tracking_uri)
 
     out_dir = analytics_dir()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -189,6 +197,24 @@ def run():
 
     # Fit on full data, then persist model and predictions
     clf.fit(X, y)
+
+    if use_mlflow:
+        with mlflow.start_run(run_name="xgboost"):
+            mlflow.log_params({
+                "n_estimators": 100,
+                "learning_rate": 0.1,
+                "n_features": len(features),
+                "n_samples": len(df),
+            })
+            mlflow.log_metrics({
+                "accuracy": metrics["accuracy"],
+                "f1": metrics["f1"],
+                "precision": metrics["precision"],
+                "recall": metrics["recall"],
+            })
+            mlflow_xgb.log_model(
+                clf, "model", registered_model_name="xgb_high_potential"
+            )
 
     # Persist model
     m_dir = models_dir()

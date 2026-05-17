@@ -3,7 +3,9 @@ Clustering: KMeans for product segments. Export cluster labels and PCA viz data.
 """
 
 import json
+import os
 
+import mlflow
 import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
@@ -17,6 +19,11 @@ logger = get_logger(__name__)
 
 
 def run(n_clusters: int = 4):
+    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", "")
+    use_mlflow = bool(tracking_uri)
+    if use_mlflow:
+        mlflow.set_tracking_uri(tracking_uri)
+
     out_dir = analytics_dir()
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -47,6 +54,11 @@ def run(n_clusters: int = 4):
     df[[c for c in cols if c in df.columns]].to_csv(out_dir / "clusters.csv", index=False)
 
     sil = silhouette_score(X_scaled, df["cluster"])
+
+    if use_mlflow:
+        with mlflow.start_run(run_name="kmeans_clustering"):
+            mlflow.log_param("n_clusters", n_clusters)
+            mlflow.log_metric("silhouette_score", float(sil))
 
     pca = PCA(n_components=2, random_state=42)
     X2 = pca.fit_transform(X_scaled)

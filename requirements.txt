@@ -30,6 +30,8 @@ langchain-google-genai>=4.0.0   # CoordinatorAgent LLM planner (Gemini via LangC
 
 # Pipeline / orchestration
 kfp>=2.4.0
+mlflow>=2.12.0
+great-expectations>=1.0.0
 
 # Dev & CI
 pytest>=7.4.0

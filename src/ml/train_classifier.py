@@ -8,8 +8,11 @@ to avoid circular data leakage (they are derived from the same inputs).
 """
 
 import json
+import os
 
 import joblib
+import mlflow
+import mlflow.sklearn
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
@@ -35,6 +38,11 @@ logger = get_logger(__name__)
 
 
 def run():
+    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", "")
+    use_mlflow = bool(tracking_uri)
+    if use_mlflow:
+        mlflow.set_tracking_uri(tracking_uri)
+
     out_dir = analytics_dir()
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -171,6 +179,24 @@ def run():
     metrics["feature_importance"] = [
         {"feature": f, "importance": round(float(v), 4)} for f, v in importance[:10]
     ]
+
+    if use_mlflow:
+        with mlflow.start_run(run_name="random_forest"):
+            mlflow.log_params({
+                "n_estimators": 300,
+                "n_features": len(features),
+                "n_samples": len(df),
+                "cv_folds": cv.n_splits,
+            })
+            mlflow.log_metrics({
+                "accuracy": metrics["accuracy"],
+                "f1": metrics["f1"],
+                "precision": metrics["precision"],
+                "recall": metrics["recall"],
+            })
+            mlflow.sklearn.log_model(
+                clf, "model", registered_model_name="rf_high_potential"
+            )
 
     # Persist model
     m_dir = models_dir()
