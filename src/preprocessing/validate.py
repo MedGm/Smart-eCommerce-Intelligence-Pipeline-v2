@@ -55,6 +55,7 @@ def log_invalid_rows(df: pd.DataFrame, required: list[str]) -> None:
     invalid = invalid.copy()
     invalid["missing_required_fields"] = missing_fields
     log_path = processed_dir() / "invalid_rows.csv"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
     invalid.to_csv(log_path, index=False)
     logger.info("Wrote %d invalid rows to %s", len(invalid), log_path)
 
