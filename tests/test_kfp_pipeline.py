@@ -25,7 +25,7 @@ def test_pipeline_yaml_has_correct_components(tmp_path):
     )
     spec = yaml.safe_load(out.read_text())
     executors = spec.get("deploymentSpec", {}).get("executors", {})
-    assert len(executors) >= 8
+    assert len(executors) >= 9
 
 
 def test_pipeline_base_image_is_correct(tmp_path):

@@ -33,6 +33,17 @@ def preprocess_op(
 
 
 @dsl.component(base_image=_IMAGE)
+def dq_op(data_dir: str, processed: dsl.Input[dsl.Dataset]):
+    """Great Expectations DQ gate — hard-stop if cleaned_products.parquet is invalid."""
+    import os
+
+    os.environ["DATA_DIR"] = data_dir
+    from src.pipeline.dq_step import run_or_raise
+
+    run_or_raise()
+
+
+@dsl.component(base_image=_IMAGE)
 def features_op(
     data_dir: str,
     processed: dsl.Input[dsl.Dataset],
@@ -122,8 +133,15 @@ def smart_ecommerce_pipeline(data_dir: str = "/app/data"):
         .set_retry(num_retries=2)
     )
 
+    dq = (
+        dq_op(data_dir=data_dir, processed=p.outputs["processed"])
+        .set_caching_options(enable_caching=False)
+        .set_retry(num_retries=1)
+    )
+
     f = (
         features_op(data_dir=data_dir, processed=p.outputs["processed"])
+        .after(dq)
         .set_caching_options(enable_caching=True)
         .set_retry(num_retries=2)
     )
