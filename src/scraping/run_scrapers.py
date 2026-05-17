@@ -8,24 +8,19 @@ import sys
 
 from src.config import get_logger
 from src.scraping.agents import CoordinatorAgent
-from src.scraping.stores import SHOPIFY_STORES, WOOCOMMERCE_STORES
+from src.scraping.stores import load_stores
 
 logger = get_logger(__name__)
 
 
 def run():
     logger.info("Initializing A2A Scraping Coordinator.")
-
-    # 3 workers by default gives good parallelization for our 8 targets
+    shopify_stores, woocommerce_stores = load_stores()
     coordinator = CoordinatorAgent(max_workers=3)
-
     logger.info(
-        f"Targeting {len(SHOPIFY_STORES)} Shopify stores and {len(WOOCOMMERCE_STORES)} WooCommerce stores."
+        f"Targeting {len(shopify_stores)} Shopify stores and {len(woocommerce_stores)} WooCommerce stores."
     )
-
-    # The CoordinatorAgent handles parallelization, LLM planning, and aggregation
-    records = coordinator.orchestrate(SHOPIFY_STORES, WOOCOMMERCE_STORES)
-
+    records = coordinator.orchestrate(shopify_stores, woocommerce_stores)
     logger.info("A2A Orchestration completed successfully.")
     return records
 
