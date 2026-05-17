@@ -154,9 +154,9 @@ class CoordinatorAgent:
         shopify_records = [r.to_dict() for r in records if r.source_platform == "shopify"]
         if shopify_records:
             if self.run_id:
-                shopify_agg_dir = raw_dir / "shopify" / self.run_id
+                shopify_agg_dir = raw_dir / "shopify" / "products"
                 shopify_agg_dir.mkdir(parents=True, exist_ok=True)
-                agg_path = shopify_agg_dir / "products.json"
+                agg_path = shopify_agg_dir / f"{self.run_id}.json"
             else:
                 agg_path = raw_dir / "shopify" / "products.json"
             with open(agg_path, "w", encoding="utf-8") as f:
@@ -166,9 +166,9 @@ class CoordinatorAgent:
         wc_records = [r.to_dict() for r in records if r.source_platform == "woocommerce"]
         if wc_records:
             if self.run_id:
-                wc_agg_dir = raw_dir / "woocommerce" / self.run_id
+                wc_agg_dir = raw_dir / "woocommerce" / "products"
                 wc_agg_dir.mkdir(parents=True, exist_ok=True)
-                agg_path = wc_agg_dir / "products.json"
+                agg_path = wc_agg_dir / f"{self.run_id}.json"
             else:
                 agg_path = raw_dir / "woocommerce" / "products.json"
             with open(agg_path, "w", encoding="utf-8") as f:

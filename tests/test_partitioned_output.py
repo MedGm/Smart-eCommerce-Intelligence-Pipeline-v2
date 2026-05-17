@@ -42,7 +42,8 @@ def test_save_writes_to_timestamped_subdir():
         path = scraper.save([record], filename="ruggable.json")
 
         # Must be inside run_id subdir
-        assert run_id in str(path), f"Expected run_id in path, got: {path}"
+        assert path.parent.name == "ruggable"
+        assert path.name == f"{run_id}.json"
         assert path.exists()
         data = json.loads(path.read_text())
         assert len(data) == 1

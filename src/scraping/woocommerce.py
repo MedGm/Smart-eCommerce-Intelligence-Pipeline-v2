@@ -11,6 +11,7 @@ Dossier tools: requests, BeautifulSoup, WooCommerce REST API.
 
 from __future__ import annotations
 
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -161,8 +162,6 @@ class WooCommerceScraper(BaseScraper):
     def _session_get_with_retry(
         self, url: str, max_retries: int = 3, backoff_base: float = 1.5, **kwargs
     ):
-        import time
-
         for attempt in range(max_retries):
             try:
                 resp = self.session.get(url, **kwargs)
@@ -183,9 +182,7 @@ class WooCommerceScraper(BaseScraper):
             except requests.RequestException as exc:
                 logger.warning("Request failed %s: %s (attempt %d)", url, exc, attempt + 1)
                 if attempt < max_retries - 1:
-                    import time as _t
-
-                    _t.sleep(backoff_base**attempt)
+                    time.sleep(backoff_base**attempt)
         return None
 
     def _strip_html(self, text: str) -> str:
