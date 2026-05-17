@@ -1,0 +1,9 @@
+FROM apache/superset:4.0.0
+
+USER root
+RUN pip install --no-cache-dir duckdb-engine==0.14.0 duckdb==1.2.2
+
+# Copy superset configuration
+COPY superset/superset_config.py /app/superset_config.py
+
+USER superset
