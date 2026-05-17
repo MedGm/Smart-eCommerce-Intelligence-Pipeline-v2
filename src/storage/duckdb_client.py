@@ -62,7 +62,9 @@ def load_products(source: str = "auto") -> pd.DataFrame:
             f"CREATE OR REPLACE TABLE products AS SELECT * FROM read_parquet('{parquet_path}')"
         )
         logger.info("Loaded products table from %s into %s", parquet_path, _warehouse_path())
-        return conn.execute("SELECT * FROM products").df()
+        result = conn.execute("SELECT * FROM products").df()
+        _warehouse_path().chmod(0o666)  # world-rw so non-root containers (Superset) can open it
+        return result
     finally:
         conn.close()
 

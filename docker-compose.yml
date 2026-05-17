@@ -31,6 +31,14 @@ services:
     environment:
       DATA_DIR: /app/data
       PYTHONPATH: /app
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      GIT_PYTHON_REFRESH: quiet
 
   # ── Object storage (MinIO — S3-compatible) ────────────────────────────────
   minio:
@@ -76,6 +84,7 @@ services:
     command: >
       --backend-store-uri sqlite:////mlflow/mlflow.db
       --default-artifact-root s3://mlflow/artifacts
+      --host-allowlist mlflow,localhost,127.0.0.1
     ports:
       - "5000:5000"   # UI + API  →  http://localhost:5000
     volumes:
@@ -144,7 +153,7 @@ services:
       - "8088:8088"   # →  http://localhost:8088
     volumes:
       - superset_home:/app/superset_home
-      - ./data:/app/data:ro   # DuckDB warehouse (read-only)
+      - ./data:/app/data
     environment:
       SUPERSET_CONFIG_PATH: /app/superset_config.py
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-change-me-in-production-32-chars!}
@@ -165,12 +174,7 @@ services:
     command: >
       /bin/sh -c "
         superset db upgrade &&
-        superset fab create-admin
-          --username admin
-          --firstname Admin
-          --lastname User
-          --email admin@superset.local
-          --password admin || true &&
+        superset fab create-admin --username admin --firstname Admin --lastname User --email admin@superset.local --password admin || true &&
         superset init &&
         echo 'Superset initialised. Login: admin / admin at http://localhost:8088'
       "
