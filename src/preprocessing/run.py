@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 
 import pandas as pd
 
+from pathlib import Path
+
 from src.config import data_dir, get_logger, processed_dir
 from src.preprocessing.clean import clean
 from src.preprocessing.transform import fill_missing, harmonize_categories
@@ -46,7 +48,37 @@ def load_raw(root=None) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _sync_raw_from_minio(root=None) -> None:
+    """Download raw JSONs from MinIO raw-data/raw/ into data/raw/ before preprocessing."""
+    from src.storage.minio_client import is_minio_configured, sync_to_local
+
+    if not is_minio_configured():
+        return
+    root = root or data_dir()
+    downloaded = sync_to_local(bucket="raw-data", prefix="raw/", local_dir=root / "raw")
+    logger.info("Synced %d raw files from MinIO to %s/raw/", len(downloaded), root)
+
+
+def _upload_processed(p_dir: Path) -> None:
+    """Upload processed artifacts to MinIO processed/ bucket."""
+    from src.storage.minio_client import is_minio_configured, upload_file
+
+    if not is_minio_configured():
+        return
+    for fname in (
+        "cleaned_products.parquet",
+        "dq_counters.json",
+        "run_metadata.json",
+        "field_failure_samples.json",
+    ):
+        path = p_dir / fname
+        if path.exists():
+            upload_file(path, bucket="processed", key=fname)
+    logger.info("Uploaded processed artifacts to MinIO processed/ bucket")
+
+
 def run():
+    _sync_raw_from_minio()
     root = data_dir()
     p_dir = processed_dir()
     p_dir.mkdir(parents=True, exist_ok=True)
@@ -280,6 +312,7 @@ def run():
         json.dumps(samples if not df.empty else {}, indent=2), encoding="utf-8"
     )
     logger.info("Preprocessing done: %d rows -> %s", len(df), out_path)
+    _upload_processed(p_dir)
     return df
 
 
