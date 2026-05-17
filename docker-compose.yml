@@ -1,17 +1,36 @@
 # Smart eCommerce Intelligence Pipeline — Docker Compose
 #
 # Services
-#   infra   : MinIO (object storage) + MLflow (experiment tracking)
-#   pipeline: full pipeline run (scrape → preprocess → features → score → train)
-#   dashboard: Streamlit BI dashboard
+#   (no profile) app: universal runner — use with `docker compose run --rm app <cmd>`
+#   infra        : MinIO (object storage) + MLflow (experiment tracking)
+#   pipeline     : full pipeline run wired to infra
+#   dashboard    : Streamlit BI dashboard wired to infra
 #
-# Usage
-#   docker compose --profile infra up -d                              # infrastructure only
-#   docker compose --profile pipeline up                              # run pipeline (needs infra)
-#   docker compose --profile dashboard up -d                          # launch dashboard (needs infra)
-#   docker compose --profile infra --profile dashboard up -d          # infra + dashboard together
+# Typical usage
+#   docker compose build                                              # build app image
+#   docker compose run --rm app pytest tests/ -q                     # run tests
+#   docker compose run --rm app python -m src.scraping.run_scrapers  # scrape
+#   docker compose --profile infra up -d                             # start infrastructure
+#   docker compose --profile pipeline up                             # full pipeline + infra
+#   docker compose --profile dashboard up -d                         # dashboard + infra
 
 services:
+
+  # ── Universal runner (no profile — always available) ─────────────────────
+  # Use this for: tests, one-off commands, local dev without infra.
+  # MinIO/MLflow env vars intentionally absent — add via .env or --env flags
+  # when you want integration with infra.
+  app:
+    build: .
+    volumes:
+      - ./data:/app/data
+      - .:/app              # live source mount for dev — edit code, re-run immediately
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATA_DIR: /app/data
+      PYTHONPATH: /app
 
   # ── Object storage (MinIO — S3-compatible) ────────────────────────────────
   minio:
@@ -70,8 +89,8 @@ services:
         condition: service_healthy
     profiles: [infra]
 
-  # ── Pipeline runner ───────────────────────────────────────────────────────
-  app:
+  # ── Full pipeline wired to infra ──────────────────────────────────────────
+  pipeline:
     build: .
     volumes:
       - ./data:/app/data
@@ -80,6 +99,7 @@ services:
         required: false
     environment:
       DATA_DIR: /app/data
+      PYTHONPATH: /app
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
@@ -102,6 +122,7 @@ services:
         required: false
     environment:
       DATA_DIR: /app/data
+      PYTHONPATH: /app
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}

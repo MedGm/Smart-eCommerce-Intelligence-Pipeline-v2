@@ -64,37 +64,51 @@ Feature Engineering         ← scoring features, model features
 
 ---
 
-## Running with Docker Compose
+## Running the project
 
-Docker Compose is the canonical way to run this project. It removes all environment problems — Python version, system deps, Playwright browsers, and infrastructure services are all containerised.
+Everything runs inside Docker — no local Python install, no pip, no venv needed.
 
-### Prerequisites
+**Prerequisite:** Docker + Docker Compose v2. Optionally a `.env` file with `GEMINI_API_KEY=...` for LLM features.
 
-- Docker + Docker Compose v2
-- (Optional) a `.env` file with `GEMINI_API_KEY=...` for LLM features
-
-### Services and profiles
-
-| Profile | Services | Command |
-|---|---|---|
-| `infra` | MinIO (S3) + MLflow + bucket init | `docker compose --profile infra up -d` |
-| `pipeline` | Pipeline runner (needs infra running) | `docker compose --profile pipeline up` |
-| `dashboard` | Streamlit on :8501 (needs infra running) | `docker compose --profile dashboard up -d` |
-
-### Typical workflow
+### Build once
 
 ```bash
-# 1. Start infrastructure (MinIO + MLflow)
-docker compose --profile infra up -d
-
-# 2. Run the full pipeline
-docker compose --profile pipeline up
-
-# 3. Launch the dashboard
-docker compose --profile dashboard up -d
+make build          # builds the app image (installs all deps inside)
 ```
 
-### Service URLs
+### Day-to-day commands
+
+```bash
+make test           # run pytest inside container
+make lint           # ruff check + format
+make scrape         # scrape all 16 stores
+make preprocess     # clean, validate, DQ counters
+make features       # feature engineering
+make score          # Top-K scoring
+make train          # RF, XGBoost, KMeans, DBSCAN, Apriori
+make pipeline       # full end-to-end run (no infra needed)
+make dashboard      # Streamlit on http://localhost:8501
+```
+
+### With infrastructure (MinIO + MLflow)
+
+```bash
+make infra-up       # start MinIO + MLflow in background
+make pipeline-full  # full pipeline wired to MinIO + MLflow
+make infra-down     # stop infrastructure
+```
+
+### One-off commands inside the container
+
+```bash
+docker compose run --rm app <any command>
+# examples:
+docker compose run --rm app python -m src.scraping.run_scrapers
+docker compose run --rm app python -m pytest tests/test_minio_client.py -v
+docker compose run --rm app ruff check src
+```
+
+### Service URLs (when infra is up)
 
 | Service | URL | Purpose |
 |---|---|---|
@@ -103,35 +117,7 @@ docker compose --profile dashboard up -d
 | MinIO S3 API | http://localhost:9000 | S3-compatible endpoint |
 | MLflow | http://localhost:5000 | Experiment runs + model registry |
 
-### Credentials (dev defaults)
-
-MinIO default credentials: `minioadmin` / `minioadmin`.  
-Override via environment: `MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD`.
-
----
-
-## Running locally (without Docker)
-
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-playwright install chromium
-cp .env.example .env   # set GEMINI_API_KEY
-
-# Full pipeline
-make pipeline
-
-# Or stage by stage
-make scrape        # A2A scraping (16 stores)
-make preprocess    # clean, validate, DQ
-make features      # feature engineering
-make score         # Top-K ranking
-make train         # RF, XGBoost, KMeans, DBSCAN, Apriori
-
-make dashboard     # Streamlit on http://localhost:8501
-make test          # pytest
-make lint          # Ruff
-```
+MinIO dev credentials: `minioadmin` / `minioadmin` (override with `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`).
 
 ---
 
@@ -139,17 +125,25 @@ make lint          # Ruff
 
 | Target | Description |
 |---|---|
-| `make pipeline` | Full end-to-end local run |
+| `make build` | Build Docker app image |
+| `make test` | pytest inside container |
+| `make test-v` | pytest verbose inside container |
+| `make lint` | Ruff check + format inside container |
 | `make scrape` | A2A scraping (all 16 stores) |
 | `make preprocess` | Preprocessing + DQ counters |
 | `make features` | Feature engineering |
 | `make score` | Top-K scoring artifacts |
 | `make train` | All ML/DM models |
+| `make pipeline` | Full end-to-end run (local, no infra) |
+| `make pipeline-full` | Full pipeline wired to MinIO + MLflow |
 | `make dashboard` | Launch Streamlit dashboard |
+| `make infra-up` | Start MinIO + MLflow in background |
+| `make infra-down` | Stop infrastructure |
+| `make warehouse` | Load DuckDB warehouse from Parquet |
+| `make dbt-run` | Run dbt models |
+| `make dbt-test` | Run dbt tests |
 | `make compile-kfp` | Compile Kubeflow pipeline YAML |
-| `make lint` | Ruff check + format |
-| `make test` | pytest |
-| `make docker-build` | Build Docker image |
+| `make clean` | Remove pycache / pytest cache |
 
 ---
 

@@ -1,70 +1,94 @@
 # Smart eCommerce Intelligence Pipeline — Makefile
-# Run from repo root: make <target>
+#
+# Everything runs inside Docker. No local Python install needed.
+# Prerequisites: Docker + Docker Compose v2.
+#
+# Quick start:
+#   make build          # build the app image
+#   make test           # run pytest inside container
+#   make scrape         # scrape all 16 stores
+#   make pipeline       # full end-to-end run (local, no infra)
+#
+# With infrastructure (MinIO + MLflow):
+#   make infra-up       # start MinIO + MLflow
+#   make infra-down     # stop and remove infra containers
+#   make pipeline-full  # full pipeline wired to MinIO + MLflow
 
-PYTHON ?= python
-PIP ?= pip
+DOCKER_RUN = docker compose run --rm app
 
-.PHONY: install install-dev scrape preprocess features score train pipeline dashboard test lint clean kfp-operator kfp-operator-deploy kfp-operator-port-forward kfp-operator-stop-forward kfp-operator-verify kfp-operator-status
+.PHONY: build test lint \
+        scrape preprocess features score train pipeline \
+        dashboard \
+        infra-up infra-down \
+        pipeline-full \
+        warehouse dbt-run dbt-test \
+        compile-kfp \
+        clean
 
-install:
-	$(PIP) install -r requirements.txt
+# ── Image ─────────────────────────────────────────────────────────────────────
+build:
+	docker compose build app
 
-install-dev: install
-	$(PIP) install pytest pytest-cov ruff
-	playwright install chromium 2>/dev/null || true
-
-# Pipeline stages (implemented in src)
-scrape:
-	$(PYTHON) -m src.scraping.run_scrapers
-
-preprocess:
-	$(PYTHON) -m src.preprocessing.run
-
-features:
-	$(PYTHON) -m src.features.build_features
-
-score:
-	$(PYTHON) -m src.scoring.topk
-
-train:
-	$(PYTHON) -m src.ml.train_classifier
-	$(PYTHON) -m src.ml.cluster_products
-
-pipeline:
-	$(PYTHON) -m src.pipeline.local_pipeline
-
-compile-kfp:
-	$(PYTHON) -c "from kfp import compiler; from src.pipeline.kubeflow_pipeline import smart_ecommerce_pipeline; compiler.Compiler().compile(pipeline_func=smart_ecommerce_pipeline, package_path='kubeflow_smart_ecommerce_pipeline.yaml')"
-	@echo "✓ Compiled kubeflow_smart_ecommerce_pipeline.yaml"
-
-dashboard:
-	PYTHONPATH=. streamlit run src/dashboard/app.py --server.port 8501
-
-kfp-operator:
-	./scripts/kfp_operator_workflow.sh all
-
-kfp-operator-deploy:
-	./scripts/kfp_operator_workflow.sh deploy
-
-kfp-operator-port-forward:
-	./scripts/kfp_operator_workflow.sh port-forward
-
-kfp-operator-stop-forward:
-	./scripts/kfp_operator_workflow.sh stop-port-forward
-
-kfp-operator-verify:
-	./scripts/kfp_operator_workflow.sh verify
-
-kfp-operator-status:
-	./scripts/kfp_operator_workflow.sh status
-
+# ── Tests & lint ──────────────────────────────────────────────────────────────
 test:
-	$(PYTHON) -m pytest tests/ -v
+	$(DOCKER_RUN) python -m pytest tests/ -q --tb=short
+
+test-v:
+	$(DOCKER_RUN) python -m pytest tests/ -v
 
 lint:
-	ruff check src tests
-	ruff format --check src tests
+	$(DOCKER_RUN) ruff check src tests
+	$(DOCKER_RUN) ruff format --check src tests
 
+# ── Pipeline stages ───────────────────────────────────────────────────────────
+scrape:
+	$(DOCKER_RUN) python -m src.scraping.run_scrapers
+
+preprocess:
+	$(DOCKER_RUN) python -m src.preprocessing.run
+
+features:
+	$(DOCKER_RUN) python -m src.features.build_features
+
+score:
+	$(DOCKER_RUN) python -m src.scoring.topk
+
+train:
+	$(DOCKER_RUN) python -m src.ml.train_classifier
+	$(DOCKER_RUN) python -m src.ml.cluster_products
+
+pipeline:
+	$(DOCKER_RUN) python -m src.pipeline.local_pipeline
+
+# ── Dashboard ─────────────────────────────────────────────────────────────────
+dashboard:
+	docker compose --profile dashboard up
+
+# ── Infrastructure ────────────────────────────────────────────────────────────
+infra-up:
+	docker compose --profile infra up -d
+
+infra-down:
+	docker compose --profile infra down
+
+# ── Full pipeline wired to infra ──────────────────────────────────────────────
+pipeline-full:
+	docker compose --profile pipeline up
+
+# ── Data lake (Phase 1) ───────────────────────────────────────────────────────
+warehouse:
+	$(DOCKER_RUN) python -c "from src.storage.duckdb_client import load_products; load_products(); print('warehouse.duckdb ready')"
+
+dbt-run: warehouse
+	$(DOCKER_RUN) sh -c "cd dbt && dbt run --profiles-dir ."
+
+dbt-test: warehouse
+	$(DOCKER_RUN) sh -c "cd dbt && dbt test --profiles-dir ."
+
+# ── Kubeflow ──────────────────────────────────────────────────────────────────
+compile-kfp:
+	$(DOCKER_RUN) python -c "from kfp import compiler; from src.pipeline.kubeflow_pipeline import smart_ecommerce_pipeline; compiler.Compiler().compile(pipeline_func=smart_ecommerce_pipeline, package_path='kubeflow_smart_ecommerce_pipeline.yaml')"
+
+# ── Clean ─────────────────────────────────────────────────────────────────────
 clean:
-	rm -rf .pytest_cache .ruff_cache
-	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	$(DOCKER_RUN) sh -c "find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; rm -rf .pytest_cache .ruff_cache; true"
