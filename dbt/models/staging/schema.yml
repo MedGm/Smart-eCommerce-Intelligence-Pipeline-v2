@@ -5,14 +5,14 @@ models:
     description: "Typed, trimmed products from raw warehouse table"
     columns:
       - name: product_id
-        tests:
+        data_tests:
           - not_null
       - name: source_platform
-        tests:
+        data_tests:
           - not_null
           - accepted_values:
               arguments:
                 values: [shopify, woocommerce]
       - name: dq_score
-        tests:
+        data_tests:
           - not_null
