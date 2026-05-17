@@ -1,108 +1,95 @@
 """
-Kubeflow-compatible pipeline: wrap local steps as KFP components.
+Kubeflow Pipelines v2 — typed components with caching, retry, and data_dir param.
 
-This pipeline mirrors the local Python pipeline:
-    preprocess -> features -> score -> train_classifier -> train_xgboost
-    -> cluster (KMeans) -> cluster (DBSCAN) -> association rules
+Changes from v1:
+- base_image: smart-ecommerce-pipeline-v2-app:latest (built by `docker compose build app`)
+- sys.path.append removed — PYTHONPATH=/app is set in Dockerfile
+- data_dir pipeline parameter passed to all components (overrides DATA_DIR env var)
+- Caching enabled on stable steps; retry=2 on all steps
 
-It is meant to be compiled with kfp and run on a Kubeflow Pipelines
-installation (e.g. on Minikube or a managed KFP cluster).
-
-NOTE: Scraping and LLM summary are excluded from KFP because:
-- Scraping requires browser automation (Playwright) which needs a different
-  container image with system deps; it runs as a pre-pipeline step.
-- LLM summary depends on API keys that should not be baked into pipeline
-  containers; it runs as a post-pipeline step or via the dashboard.
+Scraping and LLM summary excluded from KFP (browser automation / API keys).
 """
-
-from __future__ import annotations
 
 from kfp import dsl
 
+_IMAGE = "smart-ecommerce-pipeline-v2-app:latest"
 
-@dsl.component(base_image="smart-ecommerce-pipeline:local")
-def preprocess_op():
-    """Run preprocessing step (from raw JSON to cleaned parquet)."""
-    import sys
 
-    sys.path.append("/app")
+@dsl.component(base_image=_IMAGE)
+def preprocess_op(data_dir: str):
+    import os
+
+    os.environ["DATA_DIR"] = data_dir
     from src.preprocessing.run import run
 
     run()
 
 
-@dsl.component(base_image="smart-ecommerce-pipeline:local")
-def features_op():
-    """Run feature engineering step (from cleaned to features parquet)."""
-    import sys
+@dsl.component(base_image=_IMAGE)
+def features_op(data_dir: str):
+    import os
 
-    sys.path.append("/app")
+    os.environ["DATA_DIR"] = data_dir
     from src.features.build_features import run
 
     run()
 
 
-@dsl.component(base_image="smart-ecommerce-pipeline:local")
-def score_op():
-    """Run Top-K scoring and export analytics CSVs."""
-    import sys
+@dsl.component(base_image=_IMAGE)
+def score_op(data_dir: str):
+    import os
 
-    sys.path.append("/app")
+    os.environ["DATA_DIR"] = data_dir
     from src.scoring.topk import run
 
     run()
 
 
-@dsl.component(base_image="smart-ecommerce-pipeline:local")
-def train_classifier_op():
-    """Train RandomForest classifier and export metrics."""
-    import sys
+@dsl.component(base_image=_IMAGE)
+def train_classifier_op(data_dir: str):
+    import os
 
-    sys.path.append("/app")
+    os.environ["DATA_DIR"] = data_dir
     from src.ml.train_classifier import run
 
     run()
 
 
-@dsl.component(base_image="smart-ecommerce-pipeline:local")
-def train_xgboost_op():
-    """Train XGBoost classifier and export metrics."""
-    import sys
+@dsl.component(base_image=_IMAGE)
+def train_xgboost_op(data_dir: str):
+    import os
 
-    sys.path.append("/app")
+    os.environ["DATA_DIR"] = data_dir
     from src.ml.train_xgboost import run
 
     run()
 
 
-@dsl.component(base_image="smart-ecommerce-pipeline:local")
-def cluster_kmeans_op():
-    """Run KMeans clustering with PCA visualization."""
-    import sys
+@dsl.component(base_image=_IMAGE)
+def cluster_kmeans_op(data_dir: str):
+    import os
 
-    sys.path.append("/app")
+    os.environ["DATA_DIR"] = data_dir
     from src.ml.cluster_products import run
 
     run()
 
 
-@dsl.component(base_image="smart-ecommerce-pipeline:local")
-def cluster_dbscan_op():
-    """Run DBSCAN clustering for anomaly detection."""
-    import sys
+@dsl.component(base_image=_IMAGE)
+def cluster_dbscan_op(data_dir: str):
+    import os
 
-    sys.path.append("/app")
+    os.environ["DATA_DIR"] = data_dir
     from src.ml.dbscan_products import run
 
     run()
 
 
-@dsl.component(base_image="smart-ecommerce-pipeline:local")
-def association_rules_op():
-    """Run Apriori association rules mining."""
-    import sys
+@dsl.component(base_image=_IMAGE)
+def association_rules_op(data_dir: str):
+    import os
 
-    sys.path.append("/app")
+    os.environ["DATA_DIR"] = data_dir
     from src.ml.rules import run
 
     run()
@@ -115,30 +102,64 @@ def association_rules_op():
         "Scraping runs as a pre-step; LLM summary via dashboard."
     ),
 )
-def smart_ecommerce_pipeline():
-    """Kubeflow pipeline DAG definition (8 components)."""
-    p = preprocess_op()
-    f = features_op().after(p)
-    s = score_op().after(f)
-    # Classifiers can run in parallel after scoring
-    train_classifier_op().after(s)
-    train_xgboost_op().after(s)
-    # Clustering runs after scoring (needs features)
-    cluster_kmeans_op().after(f)
-    cluster_dbscan_op().after(f)
-    # Association rules run after features
-    association_rules_op().after(f)
+def smart_ecommerce_pipeline(data_dir: str = "/app/data"):
+    """KFP v2 DAG with caching and retry."""
+    p = (
+        preprocess_op(data_dir=data_dir)
+        .set_caching_options(enable_caching=False)
+        .set_retry(num_retries=2)
+    )
+
+    f = (
+        features_op(data_dir=data_dir)
+        .after(p)
+        .set_caching_options(enable_caching=True)
+        .set_retry(num_retries=2)
+    )
+
+    s = (
+        score_op(data_dir=data_dir)
+        .after(f)
+        .set_caching_options(enable_caching=True)
+        .set_retry(num_retries=2)
+    )
+
+    (
+        train_classifier_op(data_dir=data_dir)
+        .after(s)
+        .set_caching_options(enable_caching=True)
+        .set_retry(num_retries=2)
+    )
+    (
+        train_xgboost_op(data_dir=data_dir)
+        .after(s)
+        .set_caching_options(enable_caching=True)
+        .set_retry(num_retries=2)
+    )
+    (
+        cluster_kmeans_op(data_dir=data_dir)
+        .after(f)
+        .set_caching_options(enable_caching=True)
+        .set_retry(num_retries=2)
+    )
+    (
+        cluster_dbscan_op(data_dir=data_dir)
+        .after(f)
+        .set_caching_options(enable_caching=True)
+        .set_retry(num_retries=2)
+    )
+    (
+        association_rules_op(data_dir=data_dir)
+        .after(f)
+        .set_caching_options(enable_caching=True)
+        .set_retry(num_retries=2)
+    )
 
 
 def run() -> None:
     """Entry point used when calling this module as a script."""
     print(
-        "Kubeflow pipeline is defined as `smart_ecommerce_pipeline` (8 components).\\n"
-        "Compile it with kfp, for example:\\n"
-        "  from kfp import compiler\\n"
-        "  from src.pipeline.kubeflow_pipeline import smart_ecommerce_pipeline\\n"
-        "  compiler.Compiler().compile(\\n"
-        "      pipeline_func=smart_ecommerce_pipeline,\\n"
-        "      package_path='kubeflow_smart_ecommerce_pipeline.yaml',\\n"
-        "  )"
+        "Kubeflow pipeline defined as `smart_ecommerce_pipeline`.\n"
+        "Compile: make compile-kfp\n"
+        "Run:     make kfp-operator"
     )
