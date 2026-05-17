@@ -55,7 +55,8 @@ def test_validate_fails_on_empty_dataframe(tmp_path):
 
 
 def test_run_or_raise_raises_on_invalid_data(tmp_path, monkeypatch):
-    parquet = tmp_path / "cleaned_products.parquet"
+    parquet = tmp_path / "processed" / "cleaned_products.parquet"
+    parquet.parent.mkdir()
     _write_invalid_parquet(parquet)
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
 
