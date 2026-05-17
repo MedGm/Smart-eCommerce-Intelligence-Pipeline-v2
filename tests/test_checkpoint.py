@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-import tempfile
 from unittest.mock import patch, MagicMock
 
 
@@ -62,5 +61,5 @@ def test_no_run_id_no_checkpoint(tmp_path):
             worker.execute_batch([task])
 
     # No checkpoint directory should be created
-    checkpoint_path = tmp_path / "raw" / "checkpoint.json"
-    assert not checkpoint_path.exists()
+    found = list(tmp_path.rglob("checkpoint.json"))
+    assert found == [], f"Expected no checkpoint file, found: {found}"

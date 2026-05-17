@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +12,8 @@ from src.scraping.shopify import ShopifyScraper
 from src.scraping.woocommerce import WooCommerceScraper
 
 logger = get_logger(__name__)
+
+_checkpoint_lock = threading.Lock()
 
 
 def _checkpoint_path(run_id: str) -> Path:
@@ -23,7 +26,8 @@ def _load_checkpoint(run_id: str | None) -> set[str]:
     path = _checkpoint_path(run_id)
     if path.exists():
         try:
-            return set(json.load(open(path)).get("completed", []))
+            with open(path) as fh:
+                return set(json.load(fh).get("completed", []))
         except (json.JSONDecodeError, OSError):
             return set()
     return set()
@@ -107,8 +111,9 @@ class WorkerAgent:
                     scraper.save(records, f"{safe_name}.json")
                     results.extend(records)
 
-            completed.add(store_name)
-            _save_checkpoint(self.run_id, completed)
+            with _checkpoint_lock:
+                completed.add(store_name)
+                _save_checkpoint(self.run_id, completed)
 
         logger.info(
             f"WorkerAgent [{self.agent_id}]: Finished batch. Extracted {len(results)} products."
