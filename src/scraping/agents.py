@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+from pathlib import Path
 
 from src.config import data_dir, get_logger
 from src.scraping.base import ProductRecord
@@ -10,6 +11,31 @@ from src.scraping.shopify import ShopifyScraper
 from src.scraping.woocommerce import WooCommerceScraper
 
 logger = get_logger(__name__)
+
+
+def _checkpoint_path(run_id: str) -> Path:
+    return data_dir() / "raw" / run_id / "checkpoint.json"
+
+
+def _load_checkpoint(run_id: str | None) -> set[str]:
+    if not run_id:
+        return set()
+    path = _checkpoint_path(run_id)
+    if path.exists():
+        try:
+            return set(json.load(open(path)).get("completed", []))
+        except (json.JSONDecodeError, OSError):
+            return set()
+    return set()
+
+
+def _save_checkpoint(run_id: str | None, completed: set[str]) -> None:
+    if not run_id:
+        return
+    path = _checkpoint_path(run_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump({"completed": sorted(completed)}, f, indent=2)
 
 
 @dataclass
@@ -34,10 +60,19 @@ class WorkerAgent:
     def execute_batch(self, tasks: list[ScrapingTask]) -> list[ProductRecord]:
         logger.info(f"WorkerAgent [{self.agent_id}]: Starting batch of {len(tasks)} tasks.")
         results = []
+        completed = _load_checkpoint(self.run_id)
 
         for task in tasks:
             store = task.store_info
-            safe_name = store["name"].lower().replace(" ", "_").replace("'", "")
+            store_name = store["name"]
+            safe_name = store_name.lower().replace(" ", "_").replace("'", "")
+
+            if store_name in completed:
+                logger.info(
+                    f"WorkerAgent [{self.agent_id}]: Skipping {store_name} — already in checkpoint."
+                )
+                continue
+
             logger.info(f"WorkerAgent [{self.agent_id}]: Scraping {safe_name} ({task.platform})")
 
             if task.platform == "shopify":
@@ -46,7 +81,7 @@ class WorkerAgent:
                 scraper = ShopifyScraper(
                     output_dir=shopify_dir,
                     store_url=store["url"],
-                    shop_name=store["name"],
+                    shop_name=store_name,
                     geography=store.get("geography"),
                     collections=store.get("collections", ["all"]),
                     max_collection_pages=store.get("max_collection_pages", 20),
@@ -63,7 +98,7 @@ class WorkerAgent:
                 scraper = WooCommerceScraper(
                     output_dir=wc_dir,
                     site_url=store["url"],
-                    shop_name=store["name"],
+                    shop_name=store_name,
                     geography=store.get("geography"),
                     run_id=self.run_id,
                 )
@@ -71,6 +106,9 @@ class WorkerAgent:
                 if records:
                     scraper.save(records, f"{safe_name}.json")
                     results.extend(records)
+
+            completed.add(store_name)
+            _save_checkpoint(self.run_id, completed)
 
         logger.info(
             f"WorkerAgent [{self.agent_id}]: Finished batch. Extracted {len(results)} products."
