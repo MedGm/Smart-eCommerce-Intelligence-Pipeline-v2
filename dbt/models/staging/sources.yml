@@ -1,0 +1,20 @@
+version: 2
+
+sources:
+  - name: warehouse
+    schema: main
+    description: "DuckDB warehouse populated by duckdb_client.load_products()"
+    tables:
+      - name: products
+        description: "Cleaned product records from preprocessing pipeline"
+        columns:
+          - name: product_id
+            description: "Unique product identifier (platform-scoped)"
+          - name: source_platform
+            description: "shopify or woocommerce"
+          - name: shop_name
+            description: "Store name from stores.yaml"
+          - name: price
+            description: "Current price in local currency"
+          - name: dq_score
+            description: "Data quality score 0.0-1.0 from preprocessing"

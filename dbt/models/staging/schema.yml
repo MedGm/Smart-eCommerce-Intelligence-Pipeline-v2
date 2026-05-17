@@ -1,0 +1,18 @@
+version: 2
+
+models:
+  - name: stg_products
+    description: "Typed, trimmed products from raw warehouse table"
+    columns:
+      - name: product_id
+        tests:
+          - not_null
+      - name: source_platform
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [shopify, woocommerce]
+      - name: dq_score
+        tests:
+          - not_null

@@ -1,0 +1,22 @@
+version: 2
+
+models:
+  - name: mart_products_clean
+    description: "Cleaned products with discount_pct, unknown-filled labels, dq_score >= 0.5"
+    columns:
+      - name: product_id
+        tests:
+          - not_null
+      - name: dq_score
+        tests:
+          - not_null
+
+  - name: mart_top_products
+    description: "Products scored by top_k_score with shop_rank and global_rank"
+    columns:
+      - name: top_k_score
+        tests:
+          - not_null
+      - name: global_rank
+        tests:
+          - not_null
