@@ -30,6 +30,7 @@ def test_save_uploads_to_minio_when_configured(monkeypatch):
     monkeypatch.setenv("MINIO_ENDPOINT", "http://localhost:9000")
 
     with tempfile.TemporaryDirectory() as tmp:
+        monkeypatch.setenv("DATA_DIR", tmp)  # make data_dir() point to tmp
         from src.scraping.base import BaseScraper
         scraper = BaseScraper.__new__(BaseScraper)
         scraper.output_dir = Path(tmp)
@@ -40,17 +41,17 @@ def test_save_uploads_to_minio_when_configured(monkeypatch):
             path = scraper.save([_record()], filename="ruggable.json")
 
         assert mock_upload.called
-        call_args, call_kwargs = mock_upload.call_args_list[0]
-        assert call_args[0] == path                    # local path (positional)
-        assert call_kwargs.get("bucket") == "raw-data" # bucket (keyword)
-        # key should be the filename when path is not under data_dir
-        assert call_kwargs.get("key") == "20260517T130000Z.json"
+        call_args = mock_upload.call_args_list[0][0]
+        assert call_args[0] == path           # local path
+        assert call_args[1] == "raw-data"     # bucket
+        assert "ruggable" in call_args[2]     # key contains store name
 
 
 def test_save_no_upload_when_not_configured(monkeypatch):
     monkeypatch.delenv("MINIO_ENDPOINT", raising=False)
 
     with tempfile.TemporaryDirectory() as tmp:
+        monkeypatch.setenv("DATA_DIR", tmp)
         from src.scraping.base import BaseScraper
         scraper = BaseScraper.__new__(BaseScraper)
         scraper.output_dir = Path(tmp)

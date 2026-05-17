@@ -73,12 +73,13 @@ class BaseScraper:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
         # Upload to MinIO when configured — silent no-op if unavailable
-        from src.storage.minio_client import is_minio_configured, upload_file
+        from src.storage.minio_client import is_minio_configured
         if is_minio_configured():
+            from src.storage.minio_client import upload_file
             try:
-                key = str(path.relative_to(_data_dir()))
+                key = str(path.resolve().relative_to(_data_dir().resolve()))
             except ValueError:
                 key = path.name
-            upload_file(path, bucket="raw-data", key=key)
+            upload_file(path, "raw-data", key)
 
         return path

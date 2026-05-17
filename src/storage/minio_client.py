@@ -7,8 +7,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-import boto3
-
 from src.config import get_logger
 
 logger = get_logger(__name__)
@@ -19,6 +17,7 @@ def is_minio_configured() -> bool:
 
 
 def _client():
+    import boto3
     return boto3.client(
         "s3",
         endpoint_url=os.environ.get("MINIO_ENDPOINT"),
