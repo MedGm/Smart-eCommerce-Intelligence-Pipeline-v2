@@ -2,9 +2,7 @@ from pathlib import Path
 
 
 def test_superset_config_exists():
-    assert Path("superset/superset_config.py").exists(), (
-        "superset/superset_config.py not found"
-    )
+    assert Path("superset/superset_config.py").exists(), "superset/superset_config.py not found"
 
 
 def test_superset_config_has_required_keys():
@@ -24,6 +22,7 @@ def test_dockerfile_superset_installs_duckdb_engine():
 
 def test_docker_compose_has_superset_service():
     import yaml
+
     spec = yaml.safe_load(Path("docker-compose.yml").read_text())
     services = spec.get("services", {})
     assert "superset" in services, f"superset service not found. Got: {list(services)}"
@@ -32,6 +31,7 @@ def test_docker_compose_has_superset_service():
 
 def test_superset_service_has_correct_profile():
     import yaml
+
     spec = yaml.safe_load(Path("docker-compose.yml").read_text())
     superset = spec["services"]["superset"]
     profiles = superset.get("profiles", [])
@@ -40,6 +40,7 @@ def test_superset_service_has_correct_profile():
 
 def test_superset_data_volume_mounted_readonly():
     import yaml
+
     spec = yaml.safe_load(Path("docker-compose.yml").read_text())
     superset = spec["services"]["superset"]
     volumes = superset.get("volumes", [])

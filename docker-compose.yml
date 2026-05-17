@@ -1,4 +1,4 @@
-# Smart eCommerce Intelligence Pipeline — Docker Compose
+# PRISM — Product Ranking Intelligence & Signal Mining Pipeline — Docker Compose
 #
 # Services
 #   (no profile) app: universal runner — use with `docker compose run --rm app <cmd>`

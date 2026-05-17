@@ -1,5 +1,5 @@
 """
-MCP-inspired responsible architecture for the Smart eCommerce Pipeline.
+MCP-inspired responsible architecture for the PRISM Pipeline.
 
 Implements the Model Context Protocol concepts from the dossier:
 - MCP Host: the main application environment (Streamlit dashboard)

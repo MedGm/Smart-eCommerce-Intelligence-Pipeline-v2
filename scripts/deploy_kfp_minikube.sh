@@ -26,7 +26,7 @@ KFP_CLONE_DIR="/tmp/kfp-${PIPELINE_VERSION}"
 OVERLAY_DIR="$(pwd)/manifests/overlays/minikube"
 
 echo "======================================================================"
-echo " MLOps: Smart eCommerce Pipeline — Minikube Deployment"
+echo " MLOps: PRISM Pipeline — Minikube Deployment"
 echo " KFP Version  : ${PIPELINE_VERSION}"
 echo " Overlay      : ${OVERLAY_DIR}"
 echo "======================================================================"
@@ -70,14 +70,14 @@ ln -sfn "${KFP_CLONE_DIR}/manifests/kustomize" "$(pwd)/manifests/base/kfp-upstre
 echo ""
 echo "[3/5] Compiling Kubeflow pipeline DAG..."
 make compile-kfp
-echo "  ✓ kubeflow_smart_ecommerce_pipeline.yaml updated."
+echo "  ✓ kubeflow_prism_pipeline.yaml updated."
 
 # ── Step 4: Build Docker image inside Minikube ───────────────────────────────
 echo ""
 echo "[4/5] Building Docker image inside Minikube's Docker daemon..."
 eval "$(minikube docker-env)"
-docker build -t smart-ecommerce-pipeline:local .
-echo "  ✓ Image smart-ecommerce-pipeline:local is available to Kubernetes."
+docker build -t prism-app:local .
+echo "  ✓ Image prism-app:local is available to Kubernetes."
 
 # ── Step 5: Deploy / upgrade KFP using our permanent Kustomize overlay ───────
 echo ""
@@ -101,8 +101,8 @@ echo ""
 echo "======================================================================"
 echo " 🎉  Deployment complete!"
 echo ""
-echo " Docker image  : smart-ecommerce-pipeline:local (in Minikube)"
-echo " Pipeline YAML : kubeflow_smart_ecommerce_pipeline.yaml"
+echo " Docker image  : prism-app:local (in Minikube)"
+echo " Pipeline YAML : kubeflow_prism_pipeline.yaml"
 echo ""
 echo " Access the Kubeflow UI:"
 echo "   kubectl port-forward -n kubeflow svc/ml-pipeline-ui 8080:80 &"
@@ -110,6 +110,6 @@ echo "   open http://localhost:8080"
 echo ""
 echo " Upload pipeline:"
 echo "   1. Click 'Upload Pipeline'"
-echo "   2. Select kubeflow_smart_ecommerce_pipeline.yaml"
+echo "   2. Select kubeflow_prism_pipeline.yaml"
 echo "   3. Click 'Create Run' (choose the Default experiment)"
 echo "======================================================================"

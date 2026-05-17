@@ -2,6 +2,7 @@
 Great Expectations DQ gate for cleaned_products.parquet.
 Validates 8 expectations; raises RuntimeError on failure (KFP hard-stop).
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -30,9 +31,7 @@ def validate_cleaned_products(parquet_path: str | None = None) -> bool:
 
     suite = context.suites.add(gx.ExpectationSuite(name="products_suite"))
     # Row count > 0 (use between with min=1, max unbounded)
-    suite.add_expectation(
-        gx.expectations.ExpectTableRowCountToBeBetween(min_value=1)
-    )
+    suite.add_expectation(gx.expectations.ExpectTableRowCountToBeBetween(min_value=1))
     suite.add_expectation(gx.expectations.ExpectColumnToExist(column="product_id"))
     suite.add_expectation(gx.expectations.ExpectColumnToExist(column="title"))
     suite.add_expectation(gx.expectations.ExpectColumnToExist(column="source_platform"))
@@ -81,8 +80,7 @@ def run_or_raise(parquet_path: str | None = None) -> None:
     """Raises RuntimeError on DQ failure. Entry point for KFP step."""
     if not validate_cleaned_products(parquet_path):
         raise RuntimeError(
-            "DQ validation failed — pipeline stopped. "
-            "Check logs for failed expectations."
+            "DQ validation failed — pipeline stopped. Check logs for failed expectations."
         )
 
 

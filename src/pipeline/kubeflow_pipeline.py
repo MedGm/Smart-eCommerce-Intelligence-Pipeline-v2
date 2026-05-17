@@ -2,7 +2,7 @@
 Kubeflow Pipelines v2 — typed components with caching, retry, and data_dir param.
 
 Changes from v1:
-- base_image: smart-ecommerce-pipeline-v2-app:latest (built by `docker compose build app`)
+- base_image: prism-app:latest (built by `docker compose build app`)
 - sys.path.append removed — PYTHONPATH=/app is set in Dockerfile
 - data_dir pipeline parameter passed to all components (overrides DATA_DIR env var)
 - Caching enabled on stable steps; retry=2 on all steps
@@ -15,7 +15,7 @@ caching key only. On single-node Minikube this is equivalent to shared PVC.
 
 from kfp import dsl
 
-_IMAGE = "smart-ecommerce-pipeline-v2-app:latest"
+_IMAGE = "prism-app:latest"
 
 
 @dsl.component(base_image=_IMAGE)
@@ -119,13 +119,13 @@ def association_rules_op(data_dir: str, features: dsl.Input[dsl.Dataset]):
 
 
 @dsl.pipeline(
-    name="smart-ecommerce-intelligence-pipeline",
+    name="prism-pipeline",
     description=(
         "Full ML/DM pipeline for eCommerce product analysis. "
         "Scraping runs as a pre-step; LLM summary via dashboard."
     ),
 )
-def smart_ecommerce_pipeline(data_dir: str = "/app/data"):
+def prism_pipeline(data_dir: str = "/app/data"):
     """KFP v2 DAG with caching and retry."""
     p = (
         preprocess_op(data_dir=data_dir)
@@ -146,19 +146,33 @@ def smart_ecommerce_pipeline(data_dir: str = "/app/data"):
         .set_retry(num_retries=2)
     )
 
-    s = score_op(data_dir=data_dir, features=f.outputs["features"]).set_caching_options(enable_caching=True).set_retry(num_retries=2)
+    s = (
+        score_op(data_dir=data_dir, features=f.outputs["features"])
+        .set_caching_options(enable_caching=True)
+        .set_retry(num_retries=2)
+    )
 
-    train_classifier_op(data_dir=data_dir, features=f.outputs["features"]).after(s).set_caching_options(enable_caching=True).set_retry(num_retries=2)
-    train_xgboost_op(data_dir=data_dir, features=f.outputs["features"]).after(s).set_caching_options(enable_caching=True).set_retry(num_retries=2)
-    cluster_kmeans_op(data_dir=data_dir, features=f.outputs["features"]).set_caching_options(enable_caching=True).set_retry(num_retries=2)
-    cluster_dbscan_op(data_dir=data_dir, features=f.outputs["features"]).set_caching_options(enable_caching=True).set_retry(num_retries=2)
-    association_rules_op(data_dir=data_dir, features=f.outputs["features"]).set_caching_options(enable_caching=True).set_retry(num_retries=2)
+    train_classifier_op(data_dir=data_dir, features=f.outputs["features"]).after(
+        s
+    ).set_caching_options(enable_caching=True).set_retry(num_retries=2)
+    train_xgboost_op(data_dir=data_dir, features=f.outputs["features"]).after(
+        s
+    ).set_caching_options(enable_caching=True).set_retry(num_retries=2)
+    cluster_kmeans_op(data_dir=data_dir, features=f.outputs["features"]).set_caching_options(
+        enable_caching=True
+    ).set_retry(num_retries=2)
+    cluster_dbscan_op(data_dir=data_dir, features=f.outputs["features"]).set_caching_options(
+        enable_caching=True
+    ).set_retry(num_retries=2)
+    association_rules_op(data_dir=data_dir, features=f.outputs["features"]).set_caching_options(
+        enable_caching=True
+    ).set_retry(num_retries=2)
 
 
 def run() -> None:
     """Entry point used when calling this module as a script."""
     print(
-        "Kubeflow pipeline defined as `smart_ecommerce_pipeline`.\n"
+        "Kubeflow pipeline defined as `prism_pipeline`.\n"
         "Compile: make compile-kfp\n"
         "Run:     make kfp-operator-deploy"
     )

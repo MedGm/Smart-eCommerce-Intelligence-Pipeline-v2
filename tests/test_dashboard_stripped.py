@@ -28,9 +28,7 @@ def test_llm_chat_functions_present():
 
 def test_superset_link_in_sidebar():
     content = _app_content()
-    assert "8088" in content or "superset" in content.lower(), (
-        "No Superset link in new dashboard"
-    )
+    assert "8088" in content or "superset" in content.lower(), "No Superset link in new dashboard"
 
 
 def test_app_is_much_smaller():
@@ -61,16 +59,19 @@ def test_load_context_returns_empty_without_data(tmp_path, monkeypatch):
 
 def test_load_context_parses_topk(tmp_path, monkeypatch):
     import sys
-    import pandas as pd
     from unittest.mock import MagicMock
+
+    import pandas as pd
 
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     analytics = tmp_path / "analytics"
     analytics.mkdir()
-    pd.DataFrame([
-        {"product_id": "1", "category": "Rugs", "shop_name": "Ruggable", "score": 0.9},
-        {"product_id": "2", "category": "Rugs", "shop_name": "NoBull",   "score": 0.5},
-    ]).to_csv(analytics / "topk_products.csv", index=False)
+    pd.DataFrame(
+        [
+            {"product_id": "1", "category": "Rugs", "shop_name": "Ruggable", "score": 0.9},
+            {"product_id": "2", "category": "Rugs", "shop_name": "NoBull", "score": 0.5},
+        ]
+    ).to_csv(analytics / "topk_products.csv", index=False)
 
     mock_st = MagicMock()
     with monkeypatch.context() as m:

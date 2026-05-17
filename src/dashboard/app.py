@@ -1,5 +1,5 @@
 """
-Smart eCommerce Intelligence Pipeline — LLM Chat Interface
+PRISM — LLM Chat Interface
 Focused surface for Gemini-powered synthesis and interactive BI chat.
 BI exploration (charts, rankings, tables) → Apache Superset at http://localhost:8088
 """
@@ -17,7 +17,7 @@ from src.mcp.architecture import MCPClient
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Smart eCommerce — LLM Intelligence",
+    page_title="PRISM — LLM Intelligence",
     page_icon="S",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -42,10 +42,10 @@ body, .stApp { background-color: #0C1117; color: #F2EAD9; }
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## Smart eCommerce Intelligence")
+    st.markdown("## PRISM")
     st.markdown("---")
     superset_url = os.environ.get("SUPERSET_URL", "http://localhost:8088")
-    st.markdown(f"### [📊 BI Dashboard (Superset)]({superset_url})")
+    st.markdown(f"### [BI Dashboard (Superset)]({superset_url})")
     st.caption("Charts · Rankings · Clustering · Rules")
     st.markdown("---")
     page = st.radio(

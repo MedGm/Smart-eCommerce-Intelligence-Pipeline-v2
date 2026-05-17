@@ -1,4 +1,4 @@
-# Smart eCommerce Intelligence Pipeline — dependencies
+# PRISM — Product Ranking Intelligence & Signal Mining Pipeline — dependencies
 # Python 3.10+ recommended
 
 # Scraping

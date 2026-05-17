@@ -3,9 +3,9 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "smart-ecommerce-pipeline"
+name = "prism-pipeline"
 version = "0.2.0"
-description = "Smart eCommerce Intelligence Pipeline for Top-K Product Selection"
+description = "PRISM — Product Ranking Intelligence & Signal Mining Pipeline"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "Academic Use"}

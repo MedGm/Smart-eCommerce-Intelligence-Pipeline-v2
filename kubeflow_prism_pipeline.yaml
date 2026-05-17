@@ -1,0 +1,451 @@
+# PIPELINE DEFINITION
+# Name: prism-pipeline
+# Description: Full ML/DM pipeline for eCommerce product analysis. Scraping runs as a pre-step; LLM summary via dashboard.
+# Inputs:
+#    data_dir: str [Default: '/app/data']
+components:
+  comp-association-rules-op:
+    executorLabel: exec-association-rules-op
+    inputDefinitions:
+      parameters:
+        data_dir:
+          parameterType: STRING
+  comp-cluster-dbscan-op:
+    executorLabel: exec-cluster-dbscan-op
+    inputDefinitions:
+      parameters:
+        data_dir:
+          parameterType: STRING
+  comp-cluster-kmeans-op:
+    executorLabel: exec-cluster-kmeans-op
+    inputDefinitions:
+      parameters:
+        data_dir:
+          parameterType: STRING
+  comp-features-op:
+    executorLabel: exec-features-op
+    inputDefinitions:
+      parameters:
+        data_dir:
+          parameterType: STRING
+  comp-preprocess-op:
+    executorLabel: exec-preprocess-op
+    inputDefinitions:
+      parameters:
+        data_dir:
+          parameterType: STRING
+  comp-score-op:
+    executorLabel: exec-score-op
+    inputDefinitions:
+      parameters:
+        data_dir:
+          parameterType: STRING
+  comp-train-classifier-op:
+    executorLabel: exec-train-classifier-op
+    inputDefinitions:
+      parameters:
+        data_dir:
+          parameterType: STRING
+  comp-train-xgboost-op:
+    executorLabel: exec-train-xgboost-op
+    inputDefinitions:
+      parameters:
+        data_dir:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-association-rules-op:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - association_rules_op
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.1'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef association_rules_op(data_dir: str):\n    import os\n\n    os.environ[\"\
+          DATA_DIR\"] = data_dir\n    from src.ml.rules import run\n\n    run()\n\n"
+        image: prism-app:latest
+    exec-cluster-dbscan-op:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - cluster_dbscan_op
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.1'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef cluster_dbscan_op(data_dir: str):\n    import os\n\n    os.environ[\"\
+          DATA_DIR\"] = data_dir\n    from src.ml.dbscan_products import run\n\n \
+          \   run()\n\n"
+        image: prism-app:latest
+    exec-cluster-kmeans-op:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - cluster_kmeans_op
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.1'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef cluster_kmeans_op(data_dir: str):\n    import os\n\n    os.environ[\"\
+          DATA_DIR\"] = data_dir\n    from src.ml.cluster_products import run\n\n\
+          \    run()\n\n"
+        image: prism-app:latest
+    exec-features-op:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - features_op
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.1'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef features_op(data_dir: str):\n    import os\n\n    os.environ[\"\
+          DATA_DIR\"] = data_dir\n    from src.features.build_features import run\n\
+          \n    run()\n\n"
+        image: prism-app:latest
+    exec-preprocess-op:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - preprocess_op
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.1'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef preprocess_op(data_dir: str):\n    import os\n\n    os.environ[\"\
+          DATA_DIR\"] = data_dir\n    from src.preprocessing.run import run\n\n  \
+          \  run()\n\n"
+        image: prism-app:latest
+    exec-score-op:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - score_op
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.1'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef score_op(data_dir: str):\n    import os\n\n    os.environ[\"\
+          DATA_DIR\"] = data_dir\n    from src.scoring.topk import run\n\n    run()\n\
+          \n"
+        image: prism-app:latest
+    exec-train-classifier-op:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_classifier_op
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.1'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_classifier_op(data_dir: str):\n    import os\n\n    os.environ[\"\
+          DATA_DIR\"] = data_dir\n    from src.ml.train_classifier import run\n\n\
+          \    run()\n\n"
+        image: prism-app:latest
+    exec-train-xgboost-op:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_xgboost_op
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.1'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_xgboost_op(data_dir: str):\n    import os\n\n    os.environ[\"\
+          DATA_DIR\"] = data_dir\n    from src.ml.train_xgboost import run\n\n   \
+          \ run()\n\n"
+        image: prism-app:latest
+pipelineInfo:
+  description: Full ML/DM pipeline for eCommerce product analysis. Scraping runs as
+    a pre-step; LLM summary via dashboard.
+  name: prism-pipeline
+root:
+  dag:
+    tasks:
+      association-rules-op:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-association-rules-op
+        dependentTasks:
+        - features-op
+        inputs:
+          parameters:
+            data_dir:
+              componentInputParameter: data_dir
+        retryPolicy:
+          backoffDuration: 0s
+          backoffFactor: 2.0
+          backoffMaxDuration: 3600s
+          maxRetryCount: 2
+        taskInfo:
+          name: association-rules-op
+      cluster-dbscan-op:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-cluster-dbscan-op
+        dependentTasks:
+        - features-op
+        inputs:
+          parameters:
+            data_dir:
+              componentInputParameter: data_dir
+        retryPolicy:
+          backoffDuration: 0s
+          backoffFactor: 2.0
+          backoffMaxDuration: 3600s
+          maxRetryCount: 2
+        taskInfo:
+          name: cluster-dbscan-op
+      cluster-kmeans-op:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-cluster-kmeans-op
+        dependentTasks:
+        - features-op
+        inputs:
+          parameters:
+            data_dir:
+              componentInputParameter: data_dir
+        retryPolicy:
+          backoffDuration: 0s
+          backoffFactor: 2.0
+          backoffMaxDuration: 3600s
+          maxRetryCount: 2
+        taskInfo:
+          name: cluster-kmeans-op
+      features-op:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-features-op
+        dependentTasks:
+        - preprocess-op
+        inputs:
+          parameters:
+            data_dir:
+              componentInputParameter: data_dir
+        retryPolicy:
+          backoffDuration: 0s
+          backoffFactor: 2.0
+          backoffMaxDuration: 3600s
+          maxRetryCount: 2
+        taskInfo:
+          name: features-op
+      preprocess-op:
+        cachingOptions: {}
+        componentRef:
+          name: comp-preprocess-op
+        inputs:
+          parameters:
+            data_dir:
+              componentInputParameter: data_dir
+        retryPolicy:
+          backoffDuration: 0s
+          backoffFactor: 2.0
+          backoffMaxDuration: 3600s
+          maxRetryCount: 2
+        taskInfo:
+          name: preprocess-op
+      score-op:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-score-op
+        dependentTasks:
+        - features-op
+        inputs:
+          parameters:
+            data_dir:
+              componentInputParameter: data_dir
+        retryPolicy:
+          backoffDuration: 0s
+          backoffFactor: 2.0
+          backoffMaxDuration: 3600s
+          maxRetryCount: 2
+        taskInfo:
+          name: score-op
+      train-classifier-op:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-classifier-op
+        dependentTasks:
+        - score-op
+        inputs:
+          parameters:
+            data_dir:
+              componentInputParameter: data_dir
+        retryPolicy:
+          backoffDuration: 0s
+          backoffFactor: 2.0
+          backoffMaxDuration: 3600s
+          maxRetryCount: 2
+        taskInfo:
+          name: train-classifier-op
+      train-xgboost-op:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-xgboost-op
+        dependentTasks:
+        - score-op
+        inputs:
+          parameters:
+            data_dir:
+              componentInputParameter: data_dir
+        retryPolicy:
+          backoffDuration: 0s
+          backoffFactor: 2.0
+          backoffMaxDuration: 3600s
+          maxRetryCount: 2
+        taskInfo:
+          name: train-xgboost-op
+  inputDefinitions:
+    parameters:
+      data_dir:
+        defaultValue: /app/data
+        isOptional: true
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.16.1

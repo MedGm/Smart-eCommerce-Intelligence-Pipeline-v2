@@ -1,9 +1,11 @@
-# Smart eCommerce Intelligence Pipeline v2
+# PRISM — Product Ranking Intelligence & Signal Mining Pipeline
 
 **Author:** Mohamed El Gorrim  
 **Repo:** [MedGm/Smart-eCommerce-Intelligence-Pipeline-v2](https://github.com/MedGm/Smart-eCommerce-Intelligence-Pipeline-v2)
 
 End-to-end ML pipeline: scrapes products from 13 Shopify + 3 WooCommerce stores → cleans and validates → engineers features → scores by potential → trains RF + XGBoost classifiers + KMeans + DBSCAN clustering + Apriori association rules → Streamlit dashboard + Gemini LLM synthesis. Orchestrated via Kubeflow Pipelines v2 on Minikube.
+
+![PRISM Architecture](docs/diagrams/architecture.png)
 
 ---
 
@@ -201,7 +203,7 @@ smart-ecommerce-pipeline-v2/
 ├── Dockerfile            # app + dashboard image
 ├── Dockerfile.mlflow     # MLflow tracking server image
 ├── docker-compose.yml    # infra (MinIO + MLflow) + pipeline + dashboard
-├── kubeflow_smart_ecommerce_pipeline.yaml
+├── kubeflow_prism_pipeline.yaml
 └── requirements.txt
 ```
 

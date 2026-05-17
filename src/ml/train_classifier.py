@@ -182,21 +182,23 @@ def run():
 
     if use_mlflow:
         with mlflow.start_run(run_name="random_forest"):
-            mlflow.log_params({
-                "n_estimators": 300,
-                "n_features": len(features),
-                "n_samples": len(df),
-                "cv_folds": cv.n_splits,
-            })
-            mlflow.log_metrics({
-                "accuracy": metrics["accuracy"],
-                "f1": metrics["f1"],
-                "precision": metrics["precision"],
-                "recall": metrics["recall"],
-            })
-            mlflow.sklearn.log_model(
-                clf, "model", registered_model_name="rf_high_potential"
+            mlflow.log_params(
+                {
+                    "n_estimators": 300,
+                    "n_features": len(features),
+                    "n_samples": len(df),
+                    "cv_folds": cv.n_splits,
+                }
             )
+            mlflow.log_metrics(
+                {
+                    "accuracy": metrics["accuracy"],
+                    "f1": metrics["f1"],
+                    "precision": metrics["precision"],
+                    "recall": metrics["recall"],
+                }
+            )
+            mlflow.sklearn.log_model(clf, "model", registered_model_name="rf_high_potential")
 
     # Persist model
     m_dir = models_dir()

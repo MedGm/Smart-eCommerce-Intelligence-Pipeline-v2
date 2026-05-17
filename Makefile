@@ -1,4 +1,4 @@
-# Smart eCommerce Intelligence Pipeline — Makefile
+# PRISM — Product Ranking Intelligence & Signal Mining Pipeline — Makefile
 #
 # Everything runs inside Docker. No local Python install needed.
 # Prerequisites: Docker + Docker Compose v2.
@@ -94,7 +94,7 @@ dbt-test: warehouse
 
 # ── Kubeflow ──────────────────────────────────────────────────────────────────
 compile-kfp:
-	$(DOCKER_RUN) python -c "from kfp import compiler; from src.pipeline.kubeflow_pipeline import smart_ecommerce_pipeline; compiler.Compiler().compile(pipeline_func=smart_ecommerce_pipeline, package_path='kubeflow_smart_ecommerce_pipeline.yaml')"
+	$(DOCKER_RUN) python -c "from kfp import compiler; from src.pipeline.kubeflow_pipeline import prism_pipeline; compiler.Compiler().compile(pipeline_func=prism_pipeline, package_path='kubeflow_prism_pipeline.yaml')"
 
 # ── Clean ─────────────────────────────────────────────────────────────────────
 clean:
