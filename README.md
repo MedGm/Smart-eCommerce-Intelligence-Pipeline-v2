@@ -1,158 +1,235 @@
-# Smart eCommerce Intelligence Pipeline for Top-K Product Selection
+# Smart eCommerce Intelligence Pipeline v2
 
-**Repo:** [GitHub — MedGm/Smart-eCommerce-Intelligence-Pipeline](https://github.com/MedGm/Smart-eCommerce-Intelligence-Pipeline)
+**Author:** Mohamed El Gorrim  
+**Repo:** [MedGm/Smart-eCommerce-Intelligence-Pipeline-v2](https://github.com/MedGm/Smart-eCommerce-Intelligence-Pipeline-v2)
 
-**One-sentence pitch:** An end-to-end pipeline that collects eCommerce product data from Shopify and WooCommerce via A2A multi-agent scraping, scores and ranks products with an explainable formula, applies ML/data-mining for segmentation and pattern discovery, and exposes all insights through a multi-page Streamlit BI dashboard with LLM-powered synthesis (Gemini) and MCP-governed analytics access.
+End-to-end ML pipeline: scrapes products from 13 Shopify + 3 WooCommerce stores → cleans and validates → engineers features → scores by potential → trains RF + XGBoost classifiers + KMeans + DBSCAN clustering + Apriori association rules → Streamlit dashboard + Gemini LLM synthesis. Orchestrated via Kubeflow Pipelines v2 on Minikube.
 
-## Core objective
-
-Deliver a reproducible, auditable system that answers:
-
-- **Which products are the most promising?** — explainable Top-K scoring (rating, reviews, availability, discount)
-- **Which shops and categories perform best?** — per-shop and per-category ranking with avg-score dossiers
-- **What patterns emerge from the catalog?** — KMeans + DBSCAN clustering, PCA visualisation, Apriori association rules
-- **How should a decision-maker explore this?** — multi-page dashboard, LLM executive summaries, audit replay
+---
 
 ## Architecture
 
-![Architecture diagram](docs/diagrams/architecture.jpg)
+```
+Stores (16 targets)
+    │
+    ▼
+A2A Scraping Layer          ← Shopify JSON API + WooCommerce Store API
+(CoordinatorAgent → WorkerAgents)
+    │  run_id-partitioned raw JSON
+    ▼
+Preprocessing               ← clean, validate, DQ counters
+    │  Parquet + CSV
+    ▼
+Feature Engineering         ← scoring features, model features
+    │
+    ├──► Top-K Scoring      ← explainable weighted formula
+    │
+    └──► ML / Data Mining   ← RF, XGBoost, KMeans, DBSCAN, Apriori
+             │
+             ▼
+         MLflow             ← experiment tracking + model registry   (Phase 2)
+             │
+             ▼
+         MinIO              ← partitioned object storage             (Phase 1)
+             │
+             ▼
+    Streamlit Dashboard     ← BI pages + Gemini LLM synthesis
+    (+ Apache Superset)                                              (Phase 3)
+             │
+             ▼
+    Kubeflow Pipelines v2   ← orchestration on Minikube
+```
 
-See [docs/architecture.md](docs/architecture.md) and the Mermaid diagrams in [docs/diagrams/](docs/diagrams/).
+---
 
 ## Stack
 
-| Layer | Tools |
-|---|---|
-| Scraping | Playwright, requests, BeautifulSoup, A2A agent coordination |
-| Taxonomy capture | JSON-LD, breadcrumb parsing, WooCommerce category meta, HTML fallback |
-| Storage | JSON (raw), Parquet + CSV + JSONL (processed/analytics) |
-| ML / Data mining | scikit-learn, XGBoost, mlxtend (Apriori) |
-| Visualisation | Streamlit, Plotly, Altair, Matplotlib, Seaborn |
-| LLM | Google Gemini (`google-genai`, `langchain-google-genai`) |
-| Analytics access | MCP allowlist (`src/mcp/architecture.py`) — read-only |
-| Orchestration | Local pipeline + Kubeflow Pipelines v2 (KFP), Minikube, Kustomize |
-| Packaging | Docker, `docker-compose.yml` |
-| CI / Lint | GitHub Actions, Ruff, pytest (63 tests) |
-| Config | `python-dotenv`, `src/config.py` |
+| Layer | Current | Planned |
+|---|---|---|
+| Scraping | Playwright, requests, BeautifulSoup, A2A agents | — |
+| Store config | `stores.yaml` (16 targets) | — |
+| Raw storage | JSON (partitioned by `run_id`) | MinIO on Minikube (Phase 1) |
+| Data lake / transforms | — | DuckDB + dbt (Phase 1) |
+| Preprocessing | pandas, pyarrow | — |
+| ML / Data mining | scikit-learn, XGBoost, mlxtend | — |
+| Experiment tracking | — | MLflow (Phase 2) |
+| Data quality | — | Great Expectations as KFP step (Phase 2) |
+| Dashboard | Streamlit + Plotly + Altair | Apache Superset (Phase 3) |
+| LLM | Google Gemini (`google-genai`) | — |
+| Analytics gate | MCP allowlist (`src/mcp/`) | — |
+| Orchestration | Local pipeline + KFP v2 (Minikube) | Fix KFP typed artifacts + caching (Phase 2) |
+| Object storage | local `data/` | MinIO on Minikube (Phase 1) |
+| Infra | Docker Compose, Minikube, Kustomize | — |
+| CI / Lint | GitHub Actions, Ruff, pytest | — |
 
-## Latest Run Results
+---
 
-**Date:** Mar 24, 2026, 18:38:58 UTC  
-**Status:** ✅ All stages completed successfully
+## Running with Docker Compose
 
-| Metric | Value | Details |
-|--------|-------|---------|
-| **Products Processed** | 7,684 | After deduplication & validation |
-| **Data Input** | 15,368 | Raw rows from both platforms |
-| **Retention Rate** | 50.0% | After cleaning & dedup |
-| **Data Quality Score** | 89.03% | Mean DQ across all fields |
-| **Price Coverage** | 90.3% | 6,940 / 7,684 products |
-| **Category Coverage** | 96.7% | 7,429 / 7,684 products |
-| **Rating Coverage** | 23.3% | 1,788 / 7,684 products |
-| **ML Accuracy (RF)** | 95.84% | RandomForest classifier |
-| **ML Precision** | 73.81% | Honesty predictions |
-| **ML Recall** | 98.52% | High sensitivity to positives |
-| **K-Means Clusters** | 4 | Automatically detected |
-| **DBSCAN Density Clusters** | 31 | + 113 outliers (1.5%) |
-| **Association Rules** | 289 | Patterns mined (min support 5%) |
-| **Feature Dimensions** | 9 | Numeric features for ML |
+Docker Compose is the canonical way to run this project. It removes all environment problems — Python version, system deps, Playwright browsers, and infrastructure services are all containerised.
 
-**Key Findings:**
-- Strong category evidence (82.6% high-strength evidence)
-- Shopify dominates volume (7,279 / 7,684 = 94.7%)
-- WooCommerce stable (405 / 7,684 = 5.3%)
-- Models production-ready (95.84% accuracy)
-- Data homogeneity excellent (1.5% outliers via DBSCAN)
+### Prerequisites
 
-See [docs/RAPPORT_ANALYSE_PIPELINE.md](docs/RAPPORT_ANALYSE_PIPELINE.md) for detailed analysis and trend comparison.
+- Docker + Docker Compose v2
+- (Optional) a `.env` file with `GEMINI_API_KEY=...` for LLM features
 
-## Quick start
+### Services and profiles
+
+| Profile | Services | Command |
+|---|---|---|
+| `infra` | MinIO (S3) + MLflow + bucket init | `docker compose --profile infra up -d` |
+| `pipeline` | Pipeline runner (needs infra running) | `docker compose --profile pipeline up` |
+| `dashboard` | Streamlit on :8501 (needs infra running) | `docker compose --profile dashboard up -d` |
+
+### Typical workflow
 
 ```bash
-# Setup
+# 1. Start infrastructure (MinIO + MLflow)
+docker compose --profile infra up -d
+
+# 2. Run the full pipeline
+docker compose --profile pipeline up
+
+# 3. Launch the dashboard
+docker compose --profile dashboard up -d
+```
+
+### Service URLs
+
+| Service | URL | Purpose |
+|---|---|---|
+| Streamlit | http://localhost:8501 | BI dashboard + LLM chat |
+| MinIO console | http://localhost:9001 | Browse raw/processed/model artifacts |
+| MinIO S3 API | http://localhost:9000 | S3-compatible endpoint |
+| MLflow | http://localhost:5000 | Experiment runs + model registry |
+
+### Credentials (dev defaults)
+
+MinIO default credentials: `minioadmin` / `minioadmin`.  
+Override via environment: `MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD`.
+
+---
+
+## Running locally (without Docker)
+
+```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # set GEMINI_API_KEY (or OPENAI_API_KEY)
+playwright install chromium
+cp .env.example .env   # set GEMINI_API_KEY
 
-# Run full pipeline locally
+# Full pipeline
 make pipeline
 
-# Or step by step
-make scrape       # A2A scraping from Shopify + WooCommerce targets
-make preprocess   # clean, normalise, validate, emit DQ counters
-make features     # build scoring + model features
-make score        # compute Top-K rankings
-make train        # RF, XGBoost, KMeans, DBSCAN, association rules
-make dashboard    # open http://localhost:8501
+# Or stage by stage
+make scrape        # A2A scraping (16 stores)
+make preprocess    # clean, validate, DQ
+make features      # feature engineering
+make score         # Top-K ranking
+make train         # RF, XGBoost, KMeans, DBSCAN, Apriori
 
-# Lint + tests
-make lint
-make test
+make dashboard     # Streamlit on http://localhost:8501
+make test          # pytest
+make lint          # Ruff
 ```
+
+---
 
 ## Makefile targets
 
 | Target | Description |
 |---|---|
-| `make pipeline` | Full end-to-end run |
-| `make scrape` | Run A2A scraping agents |
-| `make preprocess` | Preprocessing + DQ |
+| `make pipeline` | Full end-to-end local run |
+| `make scrape` | A2A scraping (all 16 stores) |
+| `make preprocess` | Preprocessing + DQ counters |
 | `make features` | Feature engineering |
 | `make score` | Top-K scoring artifacts |
 | `make train` | All ML/DM models |
-| `make dashboard` | Launch Streamlit app |
+| `make dashboard` | Launch Streamlit dashboard |
 | `make compile-kfp` | Compile Kubeflow pipeline YAML |
 | `make lint` | Ruff check + format |
-| `make test` | pytest (63 tests) |
+| `make test` | pytest |
 | `make docker-build` | Build Docker image |
 
-## Repo structure
+---
+
+## Roadmap
+
+### Phase 0 — Scraping layer fixes ✅ done
+- WooCommerce retry/backoff (exponential, 429/503)
+- Store config moved from Python to `stores.yaml`
+- Raw output partitioned by `run_id` timestamp (`raw/shopify/ruggable/20260517T130000Z.json`)
+- Checkpoint/resume: completed stores written to `checkpoint.json`, skipped on restart
+
+### Phase 1 — Data lake
+- MinIO on Minikube as primary object storage (raw, processed, models)
+- DuckDB as analytical query layer (replaces pandas for large-scale queries)
+- dbt for SQL-based data transforms + lineage
+
+### Phase 2 — ML infrastructure
+- Kubeflow Pipelines v2: fix typed artifacts and step caching
+- MLflow alongside KFP: experiment tracking + model registry
+- Great Expectations: data quality as a KFP pipeline step
+
+### Phase 3 — BI layer
+- Apache Superset on Minikube: replaces most Streamlit reporting pages
+- Streamlit retained for LLM chat interface only
+
+---
+
+## Repository structure
 
 ```
-smart-ecommerce-pipeline/
+smart-ecommerce-pipeline-v2/
 ├── data/
-│   ├── raw/              # scraped JSON (shopify/, woocommerce/)
-│   ├── processed/        # cleaned Parquet, DQ counters, run metadata
-│   └── analytics/        # scoring CSVs, model metrics, cluster outputs, JSONL logs
+│   ├── raw/              # scraped JSON — raw/<platform>/<shop>/<run_id>.json
+│   ├── processed/        # cleaned Parquet, DQ counters
+│   └── analytics/        # scoring CSVs, model metrics, cluster outputs
 ├── docs/
-│   ├── architecture.md
-│   ├── diagrams/         # Mermaid: platform_architecture.mmd, pipeline_workflow.mmd
-│   └── ...
+│   └── diagrams/         # Mermaid: platform_architecture.mmd, pipeline_workflow.mmd
 ├── manifests/            # Kustomize overlays (Kubeflow / Minikube)
-├── notebooks/            # EDA notebook
-├── scripts/              # helper scripts (KFP operator, audit replay, scrapy spider)
+├── notebooks/            # EDA
+├── scripts/              # helpers: KFP operator, audit replay, target validation
 ├── src/
-│   ├── scraping/         # A2A agents, Shopify + WooCommerce adapters, HTML fallback
+│   ├── scraping/         # A2A agents, Shopify + WooCommerce adapters, base, stores
 │   ├── preprocessing/    # clean, transform, validate, DQ run
 │   ├── features/         # feature engineering
 │   ├── scoring/          # explainable Top-K formula
-│   ├── ml/               # RF, XGBoost, KMeans, DBSCAN, association rules, PCA
-│   ├── llm/              # Gemini summariser, prompts, OpenAI client
-│   ├── mcp/              # MCP allowlist + architecture
-│   ├── pipeline/         # local pipeline runner + KFP pipeline definition
+│   ├── ml/               # RF, XGBoost, KMeans, DBSCAN, Apriori, PCA
+│   ├── llm/              # Gemini summariser, prompts
+│   ├── mcp/              # MCP read-only analytics gate
+│   ├── pipeline/         # local runner + KFP v2 pipeline definition
 │   └── dashboard/        # Streamlit multi-page BI app
-├── tests/                # 63 unit + integration tests
+├── tests/                # 48+ unit + integration tests
+├── stores.yaml           # store catalog — edit here to add/remove targets
 ├── Makefile
-├── docker-compose.yml
-├── Dockerfile
+├── Dockerfile            # app + dashboard image
+├── Dockerfile.mlflow     # MLflow tracking server image
+├── docker-compose.yml    # infra (MinIO + MLflow) + pipeline + dashboard
 ├── kubeflow_smart_ecommerce_pipeline.yaml
 └── requirements.txt
 ```
 
+---
+
 ## Key design decisions
 
-- **Explainable scoring** — each product score is a weighted sum of normalised signals; weights are documented and configurable in `src/scoring/topk.py`.
-- **Path-aware category normalisation** — breadcrumb paths are resolved in reverse to skip title-like leaf tokens, ensuring category labels are semantic, not product names.
-- **MCP read-only gate** — all LLM analytics access goes through an allowlist (`ALLOWED_FILES`) in `src/mcp/architecture.py`; the dashboard and LLM layer cannot write to analytics artifacts.
-- **A2A scraping** — a `CoordinatorAgent` distributes store targets to concurrent `WorkerAgent` instances; each worker captures taxonomy evidence (JSON-LD, breadcrumbs, Woo meta) alongside product fields.
-- **Kubeflow parity** — pipeline stages are plain Python functions in `src/`; the KFP pipeline in `src/pipeline/kubeflow_pipeline.py` wraps the same functions, so local and Kubeflow runs are equivalent.
+**Explainable scoring** — each score is a weighted sum of normalised signals; weights documented in `src/scoring/topk.py`.
 
-## Team & ownership
+**Run-id partitioned output** — every scrape run writes to `raw/<platform>/<shop>/<run_id>.json`. No overwriting, full history, maps directly to MinIO object paths in Phase 1.
 
-- **Mohamed:** data schema, preprocessing, feature engineering, Top-K scoring, ML/DM models, pipeline orchestration, CI/testing.
-- **Ismail:** scraping adapters, source validation, dashboard pages, visualisations, LLM summary UI, demo polish.
-- **Shared:** architecture decisions, MCP layer, Kubeflow/Minikube deployment, report, integration.
+**Checkpoint/resume** — `data/raw/<run_id>/checkpoint.json` records completed stores. A crashed run restarts from where it left off.
+
+**Store config in YAML** — `stores.yaml` is the single place to add/remove scraping targets. No Python changes needed.
+
+**MCP read-only gate** — LLM analytics access goes through an allowlist in `src/mcp/architecture.py`. The LLM layer cannot write to artifacts.
+
+**Kubeflow parity** — pipeline stages are plain Python functions in `src/`. The KFP definition in `src/pipeline/kubeflow_pipeline.py` wraps the same functions, so local and KFP runs are equivalent.
+
+**Minikube-only deployment** — no cloud dependency. Everything (KFP, MinIO, Superset) runs on a local Minikube cluster.
+
+---
 
 ## License
 
-Project for academic use.
+Academic project.
