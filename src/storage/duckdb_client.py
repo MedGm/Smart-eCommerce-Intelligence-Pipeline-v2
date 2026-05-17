@@ -56,13 +56,20 @@ def load_products(source: str = "auto") -> pd.DataFrame:
         parquet_path = str(processed_dir() / "cleaned_products.parquet")
 
     conn = _conn()
-    conn.execute(
-        f"CREATE OR REPLACE TABLE products AS SELECT * FROM read_parquet('{parquet_path}')"
-    )
-    logger.info("Loaded products table from %s into %s", parquet_path, _warehouse_path())
-    return conn.execute("SELECT * FROM products").df()
+    try:
+        conn.execute(
+            f"CREATE OR REPLACE TABLE products AS SELECT * FROM read_parquet('{parquet_path}')"
+        )
+        logger.info("Loaded products table from %s into %s", parquet_path, _warehouse_path())
+        return conn.execute("SELECT * FROM products").df()
+    finally:
+        conn.close()
 
 
 def query(sql: str, duckdb_path: str | None = None) -> pd.DataFrame:
     """Run arbitrary SQL against warehouse.duckdb and return as DataFrame."""
-    return _conn(duckdb_path).execute(sql).df()
+    conn = _conn(duckdb_path)
+    try:
+        return conn.execute(sql).df()
+    finally:
+        conn.close()
