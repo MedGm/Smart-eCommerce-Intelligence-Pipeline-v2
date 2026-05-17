@@ -8,6 +8,9 @@ Changes from v1:
 - Caching enabled on stable steps; retry=2 on all steps
 
 Scraping and LLM summary excluded from KFP (browser automation / API keys).
+
+NOTE: Data flows via DATA_DIR (MinIO-backed via Phase 1). Artifacts carry metadata +
+caching key only. On single-node Minikube this is equivalent to shared PVC.
 """
 
 from kfp import dsl
@@ -45,7 +48,7 @@ def features_op(
 
 
 @dsl.component(base_image=_IMAGE)
-def score_op(data_dir: str):
+def score_op(data_dir: str, features: dsl.Input[dsl.Dataset]):
     import os
 
     os.environ["DATA_DIR"] = data_dir
@@ -55,7 +58,7 @@ def score_op(data_dir: str):
 
 
 @dsl.component(base_image=_IMAGE)
-def train_classifier_op(data_dir: str):
+def train_classifier_op(data_dir: str, features: dsl.Input[dsl.Dataset]):
     import os
 
     os.environ["DATA_DIR"] = data_dir
@@ -65,7 +68,7 @@ def train_classifier_op(data_dir: str):
 
 
 @dsl.component(base_image=_IMAGE)
-def train_xgboost_op(data_dir: str):
+def train_xgboost_op(data_dir: str, features: dsl.Input[dsl.Dataset]):
     import os
 
     os.environ["DATA_DIR"] = data_dir
@@ -75,7 +78,7 @@ def train_xgboost_op(data_dir: str):
 
 
 @dsl.component(base_image=_IMAGE)
-def cluster_kmeans_op(data_dir: str):
+def cluster_kmeans_op(data_dir: str, features: dsl.Input[dsl.Dataset]):
     import os
 
     os.environ["DATA_DIR"] = data_dir
@@ -85,7 +88,7 @@ def cluster_kmeans_op(data_dir: str):
 
 
 @dsl.component(base_image=_IMAGE)
-def cluster_dbscan_op(data_dir: str):
+def cluster_dbscan_op(data_dir: str, features: dsl.Input[dsl.Dataset]):
     import os
 
     os.environ["DATA_DIR"] = data_dir
@@ -95,7 +98,7 @@ def cluster_dbscan_op(data_dir: str):
 
 
 @dsl.component(base_image=_IMAGE)
-def association_rules_op(data_dir: str):
+def association_rules_op(data_dir: str, features: dsl.Input[dsl.Dataset]):
     import os
 
     os.environ["DATA_DIR"] = data_dir
@@ -125,43 +128,13 @@ def smart_ecommerce_pipeline(data_dir: str = "/app/data"):
         .set_retry(num_retries=2)
     )
 
-    s = (
-        score_op(data_dir=data_dir)
-        .after(f)
-        .set_caching_options(enable_caching=True)
-        .set_retry(num_retries=2)
-    )
+    s = score_op(data_dir=data_dir, features=f.outputs["features"]).set_caching_options(enable_caching=True).set_retry(num_retries=2)
 
-    (
-        train_classifier_op(data_dir=data_dir)
-        .after(s)
-        .set_caching_options(enable_caching=True)
-        .set_retry(num_retries=2)
-    )
-    (
-        train_xgboost_op(data_dir=data_dir)
-        .after(s)
-        .set_caching_options(enable_caching=True)
-        .set_retry(num_retries=2)
-    )
-    (
-        cluster_kmeans_op(data_dir=data_dir)
-        .after(f)
-        .set_caching_options(enable_caching=True)
-        .set_retry(num_retries=2)
-    )
-    (
-        cluster_dbscan_op(data_dir=data_dir)
-        .after(f)
-        .set_caching_options(enable_caching=True)
-        .set_retry(num_retries=2)
-    )
-    (
-        association_rules_op(data_dir=data_dir)
-        .after(f)
-        .set_caching_options(enable_caching=True)
-        .set_retry(num_retries=2)
-    )
+    train_classifier_op(data_dir=data_dir, features=f.outputs["features"]).after(s).set_caching_options(enable_caching=True).set_retry(num_retries=2)
+    train_xgboost_op(data_dir=data_dir, features=f.outputs["features"]).after(s).set_caching_options(enable_caching=True).set_retry(num_retries=2)
+    cluster_kmeans_op(data_dir=data_dir, features=f.outputs["features"]).set_caching_options(enable_caching=True).set_retry(num_retries=2)
+    cluster_dbscan_op(data_dir=data_dir, features=f.outputs["features"]).set_caching_options(enable_caching=True).set_retry(num_retries=2)
+    association_rules_op(data_dir=data_dir, features=f.outputs["features"]).set_caching_options(enable_caching=True).set_retry(num_retries=2)
 
 
 def run() -> None:
@@ -169,5 +142,5 @@ def run() -> None:
     print(
         "Kubeflow pipeline defined as `smart_ecommerce_pipeline`.\n"
         "Compile: make compile-kfp\n"
-        "Run:     make kfp-operator"
+        "Run:     make kfp-operator-deploy"
     )
