@@ -2,6 +2,7 @@
 MinIO / S3-compatible storage client.
 All operations are no-ops when MINIO_ENDPOINT is not set — local dev works unchanged.
 """
+
 from __future__ import annotations
 
 import os
@@ -18,6 +19,7 @@ def is_minio_configured() -> bool:
 
 def _client():
     import boto3
+
     return boto3.client(
         "s3",
         endpoint_url=os.environ.get("MINIO_ENDPOINT"),
@@ -62,7 +64,7 @@ def sync_to_local(bucket: str, prefix: str, local_dir: Path) -> list[Path]:
     local_dir.mkdir(parents=True, exist_ok=True)
     downloaded: list[Path] = []
     for key in list_objects(bucket, prefix):
-        rel = key[len(prefix):].lstrip("/")
+        rel = key[len(prefix) :].lstrip("/")
         dest = local_dir / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         _client().download_file(bucket, key, str(dest))

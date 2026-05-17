@@ -3,6 +3,7 @@ DuckDB analytics layer.
 Reads cleaned Parquet from MinIO (s3://) or local filesystem,
 exposes a SQL query interface via a persistent warehouse.duckdb file.
 """
+
 from __future__ import annotations
 
 import os

@@ -5,10 +5,9 @@ Reproducible: same raw input -> same processed output.
 
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pandas as pd
-
-from pathlib import Path
 
 from src.config import data_dir, get_logger, processed_dir
 from src.preprocessing.clean import clean

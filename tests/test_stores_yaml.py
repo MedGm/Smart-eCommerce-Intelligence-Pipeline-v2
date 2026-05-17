@@ -1,8 +1,6 @@
-from pathlib import Path
-
-
 def test_load_stores_returns_shopify_and_woocommerce():
     from src.scraping.stores import load_stores
+
     shopify, wc = load_stores()
     assert isinstance(shopify, list)
     assert isinstance(wc, list)
@@ -12,6 +10,7 @@ def test_load_stores_returns_shopify_and_woocommerce():
 
 def test_shopify_store_has_required_fields():
     from src.scraping.stores import load_stores
+
     shopify, _ = load_stores()
     for store in shopify:
         assert "url" in store, f"Missing 'url' in {store}"
@@ -20,6 +19,7 @@ def test_shopify_store_has_required_fields():
 
 def test_woocommerce_store_has_required_fields():
     from src.scraping.stores import load_stores
+
     _, wc = load_stores()
     for store in wc:
         assert "url" in store, f"Missing 'url' in {store}"
@@ -28,6 +28,7 @@ def test_woocommerce_store_has_required_fields():
 
 def test_load_stores_accepts_custom_path(tmp_path):
     from src.scraping.stores import load_stores
+
     yaml_content = """
 shopify:
   - url: https://test.myshopify.com

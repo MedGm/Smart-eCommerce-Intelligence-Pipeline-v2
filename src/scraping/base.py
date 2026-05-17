@@ -61,8 +61,8 @@ class BaseScraper:
 
     def save(self, records: list[ProductRecord], filename: str = "products.json") -> Path:
         if self.run_id:
-            stem = Path(filename).stem        # "ruggable"
-            suffix = Path(filename).suffix    # ".json"
+            stem = Path(filename).stem  # "ruggable"
+            suffix = Path(filename).suffix  # ".json"
             dest_dir = self.output_dir / stem
             dest_dir.mkdir(parents=True, exist_ok=True)
             path = dest_dir / f"{self.run_id}{suffix}"
@@ -74,8 +74,10 @@ class BaseScraper:
 
         # Upload to MinIO when configured — silent no-op if unavailable
         from src.storage.minio_client import is_minio_configured
+
         if is_minio_configured():
             from src.storage.minio_client import upload_file
+
             try:
                 key = str(path.resolve().relative_to(_data_dir().resolve()))
             except ValueError:

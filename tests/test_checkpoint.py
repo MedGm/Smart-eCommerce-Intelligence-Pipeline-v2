@@ -1,11 +1,10 @@
 import json
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 
 def test_completed_store_is_skipped(tmp_path):
     """WorkerAgent skips a store already in the checkpoint file."""
-    from src.scraping.agents import WorkerAgent, ScrapingTask
+    from src.scraping.agents import ScrapingTask, WorkerAgent
 
     run_id = "20260517T000000Z"
     checkpoint_path = tmp_path / "raw" / run_id / "checkpoint.json"
@@ -26,7 +25,7 @@ def test_completed_store_is_skipped(tmp_path):
 
 def test_completed_store_written_to_checkpoint(tmp_path):
     """After scraping, store name is written to checkpoint."""
-    from src.scraping.agents import WorkerAgent, ScrapingTask
+    from src.scraping.agents import ScrapingTask, WorkerAgent
 
     run_id = "20260517T000000Z"
     with patch("src.scraping.agents.data_dir", return_value=tmp_path):
@@ -50,7 +49,7 @@ def test_completed_store_written_to_checkpoint(tmp_path):
 
 def test_no_run_id_no_checkpoint(tmp_path):
     """Without run_id, no checkpoint is read or written — backward compat."""
-    from src.scraping.agents import WorkerAgent, ScrapingTask
+    from src.scraping.agents import ScrapingTask, WorkerAgent
 
     with patch("src.scraping.agents.data_dir", return_value=tmp_path):
         worker = WorkerAgent(agent_id="worker_0", run_id=None)

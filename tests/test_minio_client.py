@@ -1,17 +1,17 @@
-import os
-from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 
 def test_is_minio_configured_false_when_no_env(monkeypatch):
     monkeypatch.delenv("MINIO_ENDPOINT", raising=False)
     from src.storage.minio_client import is_minio_configured
+
     assert not is_minio_configured()
 
 
 def test_is_minio_configured_true_when_env_set(monkeypatch):
     monkeypatch.setenv("MINIO_ENDPOINT", "http://localhost:9000")
     from src.storage.minio_client import is_minio_configured
+
     assert is_minio_configured()
 
 
@@ -23,11 +23,10 @@ def test_upload_file_calls_s3_upload(tmp_path, monkeypatch):
     mock_client = MagicMock()
     with patch("src.storage.minio_client._client", return_value=mock_client):
         from src.storage.minio_client import upload_file
+
         upload_file(local_file, bucket="raw-data", key="raw/test.json")
 
-    mock_client.upload_file.assert_called_once_with(
-        str(local_file), "raw-data", "raw/test.json"
-    )
+    mock_client.upload_file.assert_called_once_with(str(local_file), "raw-data", "raw/test.json")
 
 
 def test_upload_file_noop_when_not_configured(tmp_path, monkeypatch):
@@ -38,6 +37,7 @@ def test_upload_file_noop_when_not_configured(tmp_path, monkeypatch):
     mock_client = MagicMock()
     with patch("src.storage.minio_client._client", return_value=mock_client):
         from src.storage.minio_client import upload_file
+
         upload_file(local_file, bucket="raw-data", key="test.json")
 
     mock_client.upload_file.assert_not_called()
@@ -55,6 +55,7 @@ def test_list_objects_returns_keys(monkeypatch):
 
     with patch("src.storage.minio_client._client", return_value=mock_client):
         from src.storage.minio_client import list_objects
+
         keys = list_objects("raw-data", prefix="raw/")
 
     assert keys == ["raw/a.json", "raw/b.json", "raw/c.json"]
@@ -63,6 +64,7 @@ def test_list_objects_returns_keys(monkeypatch):
 def test_list_objects_returns_empty_when_not_configured(monkeypatch):
     monkeypatch.delenv("MINIO_ENDPOINT", raising=False)
     from src.storage.minio_client import list_objects
+
     assert list_objects("raw-data") == []
 
 
@@ -77,9 +79,8 @@ def test_sync_to_local_downloads_objects(tmp_path, monkeypatch):
 
     with patch("src.storage.minio_client._client", return_value=mock_client):
         from src.storage.minio_client import sync_to_local
-        downloaded = sync_to_local(
-            bucket="raw-data", prefix="raw/", local_dir=tmp_path
-        )
+
+        downloaded = sync_to_local(bucket="raw-data", prefix="raw/", local_dir=tmp_path)
 
     assert len(downloaded) == 1
     assert downloaded[0] == tmp_path / "shopify/ruggable/run1.json"
