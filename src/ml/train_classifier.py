@@ -179,7 +179,9 @@ def run():
 
     # Write per-product predictions
     proba_full = clf.predict_proba(X)[:, 1]
-    preds_df = df[["product_id"]].copy() if "product_id" in df.columns else pd.DataFrame(index=df.index)
+    preds_df = (
+        df[["product_id"]].copy() if "product_id" in df.columns else pd.DataFrame(index=df.index)
+    )
     preds_df["rf_proba"] = proba_full
     preds_df.to_csv(out_dir / "rf_predictions.csv", index=False)
 

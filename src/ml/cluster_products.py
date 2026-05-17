@@ -3,6 +3,7 @@ Clustering: KMeans for product segments. Export cluster labels and PCA viz data.
 """
 
 import json
+
 import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA

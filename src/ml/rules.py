@@ -46,11 +46,10 @@ def run(min_support: float = 0.05, min_confidence: float = 0.3):
             items.append("has_discount")
         return items
 
-    use_cols = [c for c in ["category", "price_bucket", "is_in_stock", "discount_pct"] if c in df.columns]
-    transactions = [
-        items for items in df[use_cols].apply(_build_items, axis=1)
-        if items
+    use_cols = [
+        c for c in ["category", "price_bucket", "is_in_stock", "discount_pct"] if c in df.columns
     ]
+    transactions = [items for items in df[use_cols].apply(_build_items, axis=1) if items]
 
     if len(transactions) < 10:
         logger.warning("Not enough transactions for association rules.")

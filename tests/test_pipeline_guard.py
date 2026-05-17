@@ -1,6 +1,5 @@
-from unittest.mock import patch
-from pathlib import Path
 import logging
+from unittest.mock import patch
 
 
 def test_features_step_skipped_when_preprocessing_fails(tmp_path, caplog):
@@ -13,13 +12,16 @@ def test_features_step_skipped_when_preprocessing_fails(tmp_path, caplog):
 
     from src.pipeline import local_pipeline
 
-    with patch("src.pipeline.local_pipeline._run_step", side_effect=fake_run_step), \
-         patch("src.pipeline.local_pipeline.processed_dir", return_value=tmp_path / "processed"), \
-         caplog.at_level(logging.WARNING):
+    with (
+        patch("src.pipeline.local_pipeline._run_step", side_effect=fake_run_step),
+        patch("src.pipeline.local_pipeline.processed_dir", return_value=tmp_path / "processed"),
+        caplog.at_level(logging.WARNING),
+    ):
         local_pipeline.run()
 
-    assert "Features" not in executed_steps, \
+    assert "Features" not in executed_steps, (
         f"Features ran despite missing preprocessing artifact. Steps run: {executed_steps}"
+    )
 
 
 def test_steps_run_normally_when_artifacts_present(tmp_path):
@@ -30,7 +32,7 @@ def test_steps_run_normally_when_artifacts_present(tmp_path):
         if name == "Preprocessing":
             proc = tmp_path / "processed"
             proc.mkdir(parents=True, exist_ok=True)
-            (proc / "products.parquet").write_bytes(b"fake")
+            (proc / "cleaned_products.parquet").write_bytes(b"fake")
         if name == "Features":
             proc = tmp_path / "processed"
             proc.mkdir(parents=True, exist_ok=True)
@@ -39,8 +41,10 @@ def test_steps_run_normally_when_artifacts_present(tmp_path):
 
     from src.pipeline import local_pipeline
 
-    with patch("src.pipeline.local_pipeline._run_step", side_effect=fake_run_step), \
-         patch("src.pipeline.local_pipeline.processed_dir", return_value=tmp_path / "processed"):
+    with (
+        patch("src.pipeline.local_pipeline._run_step", side_effect=fake_run_step),
+        patch("src.pipeline.local_pipeline.processed_dir", return_value=tmp_path / "processed"),
+    ):
         local_pipeline.run()
 
     assert "Preprocessing" in executed_steps
