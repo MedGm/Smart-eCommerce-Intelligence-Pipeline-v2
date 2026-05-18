@@ -7,48 +7,118 @@ components:
   comp-association-rules-op:
     executorLabel: exec-association-rules-op
     inputDefinitions:
+      artifacts:
+        features:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
       parameters:
         data_dir:
           parameterType: STRING
   comp-cluster-dbscan-op:
     executorLabel: exec-cluster-dbscan-op
     inputDefinitions:
+      artifacts:
+        features:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
       parameters:
         data_dir:
           parameterType: STRING
   comp-cluster-kmeans-op:
     executorLabel: exec-cluster-kmeans-op
     inputDefinitions:
+      artifacts:
+        features:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
       parameters:
         data_dir:
+          parameterType: STRING
+  comp-dq-op:
+    executorLabel: exec-dq-op
+    inputDefinitions:
+      artifacts:
+        processed:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        data_dir:
+          parameterType: STRING
+        minio_access_key:
+          defaultValue: minioadmin
+          isOptional: true
+          parameterType: STRING
+        minio_endpoint:
+          defaultValue: http://192.168.49.1:9000
+          isOptional: true
+          parameterType: STRING
+        minio_secret_key:
+          defaultValue: minioadmin
+          isOptional: true
           parameterType: STRING
   comp-features-op:
     executorLabel: exec-features-op
     inputDefinitions:
+      artifacts:
+        processed:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
       parameters:
         data_dir:
           parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        features:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
   comp-preprocess-op:
     executorLabel: exec-preprocess-op
     inputDefinitions:
       parameters:
         data_dir:
           parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        processed:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
   comp-score-op:
     executorLabel: exec-score-op
     inputDefinitions:
+      artifacts:
+        features:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
       parameters:
         data_dir:
           parameterType: STRING
   comp-train-classifier-op:
     executorLabel: exec-train-classifier-op
     inputDefinitions:
+      artifacts:
+        features:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
       parameters:
         data_dir:
           parameterType: STRING
   comp-train-xgboost-op:
     executorLabel: exec-train-xgboost-op
     inputDefinitions:
+      artifacts:
+        features:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
       parameters:
         data_dir:
           parameterType: STRING
@@ -80,9 +150,10 @@ deploymentSpec:
 
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef association_rules_op(data_dir: str):\n    import os\n\n    os.environ[\"\
-          DATA_DIR\"] = data_dir\n    from src.ml.rules import run\n\n    run()\n\n"
-        image: prism-app:latest
+          \ *\n\ndef association_rules_op(data_dir: str, features: dsl.Input[dsl.Dataset]):\n\
+          \    import os\n\n    os.environ[\"DATA_DIR\"] = data_dir\n    from src.ml.rules\
+          \ import run\n\n    run()\n\n"
+        image: prism-app:local
     exec-cluster-dbscan-op:
       container:
         args:
@@ -109,10 +180,10 @@ deploymentSpec:
 
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef cluster_dbscan_op(data_dir: str):\n    import os\n\n    os.environ[\"\
-          DATA_DIR\"] = data_dir\n    from src.ml.dbscan_products import run\n\n \
-          \   run()\n\n"
-        image: prism-app:latest
+          \ *\n\ndef cluster_dbscan_op(data_dir: str, features: dsl.Input[dsl.Dataset]):\n\
+          \    import os\n\n    os.environ[\"DATA_DIR\"] = data_dir\n    from src.ml.dbscan_products\
+          \ import run\n\n    run()\n\n"
+        image: prism-app:local
     exec-cluster-kmeans-op:
       container:
         args:
@@ -139,10 +210,51 @@ deploymentSpec:
 
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef cluster_kmeans_op(data_dir: str):\n    import os\n\n    os.environ[\"\
-          DATA_DIR\"] = data_dir\n    from src.ml.cluster_products import run\n\n\
-          \    run()\n\n"
-        image: prism-app:latest
+          \ *\n\ndef cluster_kmeans_op(data_dir: str, features: dsl.Input[dsl.Dataset]):\n\
+          \    import os\n\n    os.environ[\"DATA_DIR\"] = data_dir\n    from src.ml.cluster_products\
+          \ import run\n\n    run()\n\n"
+        image: prism-app:local
+    exec-dq-op:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - dq_op
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.1'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef dq_op(\n    data_dir: str,\n    processed: dsl.Input[dsl.Dataset],\n\
+          \    minio_endpoint: str = \"http://192.168.49.1:9000\",\n    minio_access_key:\
+          \ str = \"minioadmin\",\n    minio_secret_key: str = \"minioadmin\",\n):\n\
+          \    \"\"\"Great Expectations DQ gate \u2014 downloads parquet from MinIO\
+          \ then validates.\"\"\"\n    import os\n    import pathlib\n\n    os.environ[\"\
+          DATA_DIR\"] = data_dir\n    os.environ[\"MINIO_ENDPOINT\"] = minio_endpoint\n\
+          \    os.environ[\"MINIO_ACCESS_KEY\"] = minio_access_key\n    os.environ[\"\
+          MINIO_SECRET_KEY\"] = minio_secret_key\n\n    parquet_local = pathlib.Path(data_dir)\
+          \ / \"processed\" / \"cleaned_products.parquet\"\n    if not parquet_local.exists():\n\
+          \        parquet_local.parent.mkdir(parents=True, exist_ok=True)\n     \
+          \   from src.storage.minio_client import _client\n        _client().download_file(\"\
+          processed\", \"cleaned_products.parquet\", str(parquet_local))\n\n    from\
+          \ src.pipeline.dq_step import run_or_raise\n    run_or_raise(parquet_path=str(parquet_local))\n\
+          \n"
+        image: prism-app:local
     exec-features-op:
       container:
         args:
@@ -169,10 +281,11 @@ deploymentSpec:
 
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef features_op(data_dir: str):\n    import os\n\n    os.environ[\"\
+          \ *\n\ndef features_op(\n    data_dir: str,\n    processed: dsl.Input[dsl.Dataset],\n\
+          \    features: dsl.Output[dsl.Dataset],\n):\n    import os\n\n    os.environ[\"\
           DATA_DIR\"] = data_dir\n    from src.features.build_features import run\n\
-          \n    run()\n\n"
-        image: prism-app:latest
+          \n    run()\n    features.metadata[\"data_dir\"] = data_dir\n\n"
+        image: prism-app:local
     exec-preprocess-op:
       container:
         args:
@@ -199,10 +312,11 @@ deploymentSpec:
 
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef preprocess_op(data_dir: str):\n    import os\n\n    os.environ[\"\
-          DATA_DIR\"] = data_dir\n    from src.preprocessing.run import run\n\n  \
-          \  run()\n\n"
-        image: prism-app:latest
+          \ *\n\ndef preprocess_op(\n    data_dir: str,\n    processed: dsl.Output[dsl.Dataset],\n\
+          ):\n    import os\n\n    os.environ[\"DATA_DIR\"] = data_dir\n    from src.preprocessing.run\
+          \ import run\n\n    run()\n    processed.metadata[\"data_dir\"] = data_dir\n\
+          \n"
+        image: prism-app:local
     exec-score-op:
       container:
         args:
@@ -229,10 +343,10 @@ deploymentSpec:
 
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef score_op(data_dir: str):\n    import os\n\n    os.environ[\"\
-          DATA_DIR\"] = data_dir\n    from src.scoring.topk import run\n\n    run()\n\
-          \n"
-        image: prism-app:latest
+          \ *\n\ndef score_op(data_dir: str, features: dsl.Input[dsl.Dataset]):\n\
+          \    import os\n\n    os.environ[\"DATA_DIR\"] = data_dir\n    from src.scoring.topk\
+          \ import run\n\n    run()\n\n"
+        image: prism-app:local
     exec-train-classifier-op:
       container:
         args:
@@ -259,10 +373,10 @@ deploymentSpec:
 
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef train_classifier_op(data_dir: str):\n    import os\n\n    os.environ[\"\
-          DATA_DIR\"] = data_dir\n    from src.ml.train_classifier import run\n\n\
-          \    run()\n\n"
-        image: prism-app:latest
+          \ *\n\ndef train_classifier_op(data_dir: str, features: dsl.Input[dsl.Dataset]):\n\
+          \    import os\n\n    os.environ[\"DATA_DIR\"] = data_dir\n    from src.ml.train_classifier\
+          \ import run\n\n    run()\n\n"
+        image: prism-app:local
     exec-train-xgboost-op:
       container:
         args:
@@ -289,10 +403,10 @@ deploymentSpec:
 
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef train_xgboost_op(data_dir: str):\n    import os\n\n    os.environ[\"\
-          DATA_DIR\"] = data_dir\n    from src.ml.train_xgboost import run\n\n   \
-          \ run()\n\n"
-        image: prism-app:latest
+          \ *\n\ndef train_xgboost_op(data_dir: str, features: dsl.Input[dsl.Dataset]):\n\
+          \    import os\n\n    os.environ[\"DATA_DIR\"] = data_dir\n    from src.ml.train_xgboost\
+          \ import run\n\n    run()\n\n"
+        image: prism-app:local
 pipelineInfo:
   description: Full ML/DM pipeline for eCommerce product analysis. Scraping runs as
     a pre-step; LLM summary via dashboard.
@@ -308,6 +422,11 @@ root:
         dependentTasks:
         - features-op
         inputs:
+          artifacts:
+            features:
+              taskOutputArtifact:
+                outputArtifactKey: features
+                producerTask: features-op
           parameters:
             data_dir:
               componentInputParameter: data_dir
@@ -326,6 +445,11 @@ root:
         dependentTasks:
         - features-op
         inputs:
+          artifacts:
+            features:
+              taskOutputArtifact:
+                outputArtifactKey: features
+                producerTask: features-op
           parameters:
             data_dir:
               componentInputParameter: data_dir
@@ -344,6 +468,11 @@ root:
         dependentTasks:
         - features-op
         inputs:
+          artifacts:
+            features:
+              taskOutputArtifact:
+                outputArtifactKey: features
+                producerTask: features-op
           parameters:
             data_dir:
               componentInputParameter: data_dir
@@ -354,14 +483,42 @@ root:
           maxRetryCount: 2
         taskInfo:
           name: cluster-kmeans-op
+      dq-op:
+        cachingOptions: {}
+        componentRef:
+          name: comp-dq-op
+        dependentTasks:
+        - preprocess-op
+        inputs:
+          artifacts:
+            processed:
+              taskOutputArtifact:
+                outputArtifactKey: processed
+                producerTask: preprocess-op
+          parameters:
+            data_dir:
+              componentInputParameter: data_dir
+        retryPolicy:
+          backoffDuration: 0s
+          backoffFactor: 2.0
+          backoffMaxDuration: 3600s
+          maxRetryCount: 1
+        taskInfo:
+          name: dq-op
       features-op:
         cachingOptions:
           enableCache: true
         componentRef:
           name: comp-features-op
         dependentTasks:
+        - dq-op
         - preprocess-op
         inputs:
+          artifacts:
+            processed:
+              taskOutputArtifact:
+                outputArtifactKey: processed
+                producerTask: preprocess-op
           parameters:
             data_dir:
               componentInputParameter: data_dir
@@ -395,6 +552,11 @@ root:
         dependentTasks:
         - features-op
         inputs:
+          artifacts:
+            features:
+              taskOutputArtifact:
+                outputArtifactKey: features
+                producerTask: features-op
           parameters:
             data_dir:
               componentInputParameter: data_dir
@@ -411,8 +573,14 @@ root:
         componentRef:
           name: comp-train-classifier-op
         dependentTasks:
+        - features-op
         - score-op
         inputs:
+          artifacts:
+            features:
+              taskOutputArtifact:
+                outputArtifactKey: features
+                producerTask: features-op
           parameters:
             data_dir:
               componentInputParameter: data_dir
@@ -429,8 +597,14 @@ root:
         componentRef:
           name: comp-train-xgboost-op
         dependentTasks:
+        - features-op
         - score-op
         inputs:
+          artifacts:
+            features:
+              taskOutputArtifact:
+                outputArtifactKey: features
+                producerTask: features-op
           parameters:
             data_dir:
               componentInputParameter: data_dir

@@ -222,6 +222,8 @@ def run():
     m_dir = models_dir()
     m_dir.mkdir(parents=True, exist_ok=True)
     joblib.dump(clf, m_dir / "xgboost.joblib")
+    from src.storage.minio_client import upload_file as _minio_upload
+    _minio_upload(m_dir / "xgboost.joblib", "models", "xgboost.joblib")
 
     # Write per-product predictions
     proba_full = clf.predict_proba(X)[:, 1]

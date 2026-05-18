@@ -15,7 +15,7 @@ caching key only. On single-node Minikube this is equivalent to shared PVC.
 
 from kfp import dsl
 
-_IMAGE = "prism-app:latest"
+_IMAGE = "prism-app:local"
 
 
 @dsl.component(base_image=_IMAGE)
@@ -33,14 +33,30 @@ def preprocess_op(
 
 
 @dsl.component(base_image=_IMAGE)
-def dq_op(data_dir: str, processed: dsl.Input[dsl.Dataset]):
-    """Great Expectations DQ gate — hard-stop if cleaned_products.parquet is invalid."""
+def dq_op(
+    data_dir: str,
+    processed: dsl.Input[dsl.Dataset],
+    minio_endpoint: str = "http://192.168.49.1:9000",
+    minio_access_key: str = "minioadmin",
+    minio_secret_key: str = "minioadmin",
+):
+    """Great Expectations DQ gate — downloads parquet from MinIO then validates."""
     import os
+    import pathlib
 
     os.environ["DATA_DIR"] = data_dir
-    from src.pipeline.dq_step import run_or_raise
+    os.environ["MINIO_ENDPOINT"] = minio_endpoint
+    os.environ["MINIO_ACCESS_KEY"] = minio_access_key
+    os.environ["MINIO_SECRET_KEY"] = minio_secret_key
 
-    run_or_raise()
+    parquet_local = pathlib.Path(data_dir) / "processed" / "cleaned_products.parquet"
+    if not parquet_local.exists():
+        parquet_local.parent.mkdir(parents=True, exist_ok=True)
+        from src.storage.minio_client import _client
+        _client().download_file("processed", "cleaned_products.parquet", str(parquet_local))
+
+    from src.pipeline.dq_step import run_or_raise
+    run_or_raise(parquet_path=str(parquet_local))
 
 
 @dsl.component(base_image=_IMAGE)
@@ -152,22 +168,11 @@ def prism_pipeline(data_dir: str = "/app/data"):
         .set_retry(num_retries=2)
     )
 
-    train_classifier_op(data_dir=data_dir, features=f.outputs["features"]).after(
-        s
-    ).set_caching_options(enable_caching=True).set_retry(num_retries=2)
-    train_xgboost_op(data_dir=data_dir, features=f.outputs["features"]).after(
-        s
-    ).set_caching_options(enable_caching=True).set_retry(num_retries=2)
-    cluster_kmeans_op(data_dir=data_dir, features=f.outputs["features"]).set_caching_options(
-        enable_caching=True
-    ).set_retry(num_retries=2)
-    cluster_dbscan_op(data_dir=data_dir, features=f.outputs["features"]).set_caching_options(
-        enable_caching=True
-    ).set_retry(num_retries=2)
-    association_rules_op(data_dir=data_dir, features=f.outputs["features"]).set_caching_options(
-        enable_caching=True
-    ).set_retry(num_retries=2)
-
+    train_classifier_op(data_dir=data_dir, features=f.outputs["features"]).after(s).set_caching_options(enable_caching=True).set_retry(num_retries=2)
+    train_xgboost_op(data_dir=data_dir, features=f.outputs["features"]).after(s).set_caching_options(enable_caching=True).set_retry(num_retries=2)
+    cluster_kmeans_op(data_dir=data_dir, features=f.outputs["features"]).set_caching_options(enable_caching=True).set_retry(num_retries=2)
+    cluster_dbscan_op(data_dir=data_dir, features=f.outputs["features"]).set_caching_options(enable_caching=True).set_retry(num_retries=2)
+    association_rules_op(data_dir=data_dir, features=f.outputs["features"]).set_caching_options(enable_caching=True).set_retry(num_retries=2)
 
 def run() -> None:
     """Entry point used when calling this module as a script."""

@@ -84,7 +84,6 @@ services:
     command: >
       --backend-store-uri sqlite:////mlflow/mlflow.db
       --default-artifact-root s3://mlflow/artifacts
-      --host-allowlist mlflow,localhost,127.0.0.1
     ports:
       - "5000:5000"   # UI + API  →  http://localhost:5000
     volumes:
@@ -93,6 +92,7 @@ services:
       AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      MLFLOW_SERVER_ALLOWED_HOSTS: "*"
     depends_on:
       minio:
         condition: service_healthy

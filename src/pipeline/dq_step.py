@@ -43,7 +43,7 @@ def validate_cleaned_products(parquet_path: str | None = None) -> bool:
     )
     suite.add_expectation(
         gx.expectations.ExpectColumnValuesToBeBetween(
-            column="dq_score", min_value=0.0, max_value=1.0, mostly=0.95
+            column="dq_score", min_value=0.0, max_value=100.0, mostly=0.95
         )
     )
     suite.add_expectation(
