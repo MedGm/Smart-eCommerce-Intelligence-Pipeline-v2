@@ -90,13 +90,19 @@ def rebuild_warehouse() -> None:
     if minio_configured:
         try:
             from src.storage.minio_client import _client
+
             c = _client()
             a_dir = analytics_dir()
             a_dir.mkdir(parents=True, exist_ok=True)
             for fname in [
-                "topk_products.csv", "topk_per_category.csv", "topk_per_shop.csv",
-                "clusters.csv", "association_rules.csv",
-                "model_metrics.json", "model_metrics_xgboost.json", "cluster_metrics.json",
+                "topk_products.csv",
+                "topk_per_category.csv",
+                "topk_per_shop.csv",
+                "clusters.csv",
+                "association_rules.csv",
+                "model_metrics.json",
+                "model_metrics_xgboost.json",
+                "cluster_metrics.json",
             ]:
                 try:
                     c.download_file("processed", f"analytics/{fname}", str(a_dir / fname))
@@ -107,8 +113,9 @@ def rebuild_warehouse() -> None:
             p_dir = processed_dir()
             p_dir.mkdir(parents=True, exist_ok=True)
             try:
-                c.download_file("processed", "cleaned_products.parquet",
-                                str(p_dir / "cleaned_products.parquet"))
+                c.download_file(
+                    "processed", "cleaned_products.parquet", str(p_dir / "cleaned_products.parquet")
+                )
                 logger.info("Downloaded cleaned_products.parquet")
             except Exception as e:
                 logger.warning("Could not download cleaned_products.parquet: %s", e)
@@ -124,14 +131,17 @@ def rebuild_warehouse() -> None:
             conn.execute(
                 f"CREATE OR REPLACE TABLE products AS SELECT * FROM read_parquet('{parquet}')"
             )
-            logger.info("Loaded products (%d rows)", conn.execute("SELECT count(*) FROM products").fetchone()[0])
+            logger.info(
+                "Loaded products (%d rows)",
+                conn.execute("SELECT count(*) FROM products").fetchone()[0],
+            )
 
         # Analytics CSV tables
         csv_tables = [
-            ("topk_products",     "topk_products.csv"),
+            ("topk_products", "topk_products.csv"),
             ("topk_per_category", "topk_per_category.csv"),
-            ("topk_per_shop",     "topk_per_shop.csv"),
-            ("clusters",          "clusters.csv"),
+            ("topk_per_shop", "topk_per_shop.csv"),
+            ("clusters", "clusters.csv"),
             ("association_rules", "association_rules.csv"),
         ]
         for table, fname in csv_tables:
