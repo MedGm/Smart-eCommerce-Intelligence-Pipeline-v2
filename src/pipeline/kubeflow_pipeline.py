@@ -1,16 +1,13 @@
 """
-Kubeflow Pipelines v2 — typed components with caching, retry, and data_dir param.
+Kubeflow Pipelines v2 — typed components with MinIO-backed I/O.
 
-Changes from v1:
-- base_image: prism-app:latest (built by `docker compose build app`)
-- sys.path.append removed — PYTHONPATH=/app is set in Dockerfile
-- data_dir pipeline parameter passed to all components (overrides DATA_DIR env var)
-- Caching enabled on stable steps; retry=2 on all steps
+Each pod is ephemeral with an empty filesystem. Every component must:
+  1. Download required inputs from host MinIO at the start
+  2. Run its logic
+  3. Upload outputs to host MinIO at the end
 
-Scraping and LLM summary excluded from KFP (browser automation / API keys).
-
-NOTE: Data flows via DATA_DIR (MinIO-backed via Phase 1). Artifacts carry metadata +
-caching key only. On single-node Minikube this is equivalent to shared PVC.
+Host MinIO is reachable at 192.168.49.1:9000 (minikube gateway).
+Host MLflow is reachable at 192.168.49.1:5000.
 """
 
 from kfp import dsl
@@ -18,45 +15,44 @@ from kfp import dsl
 _IMAGE = "prism-app:local"
 
 
-@dsl.component(base_image=_IMAGE)
-def preprocess_op(
-    data_dir: str,
-    processed: dsl.Output[dsl.Dataset],
-):
-    import os
+def _dl(client, bucket: str, key: str, local_path) -> None:
+    """Download a single file from MinIO, creating parent dirs."""
+    import pathlib
+    p = pathlib.Path(local_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    client.download_file(bucket, key, str(p))
 
+
+def _ul(client, local_path, bucket: str, key: str) -> None:
+    """Upload a file to MinIO if it exists."""
+    import pathlib
+    p = pathlib.Path(local_path)
+    if p.exists():
+        client.upload_file(str(p), bucket, key)
+
+
+@dsl.component(base_image=_IMAGE)
+def preprocess_op(data_dir: str, processed: dsl.Output[dsl.Dataset]):
+    """Sync raw from MinIO → preprocess → upload cleaned parquet."""
+    import os
     os.environ["DATA_DIR"] = data_dir
     from src.preprocessing.run import run
-
-    run()
+    run()  # internally syncs raw from MinIO + uploads processed
     processed.metadata["data_dir"] = data_dir
 
 
 @dsl.component(base_image=_IMAGE)
-def dq_op(
-    data_dir: str,
-    processed: dsl.Input[dsl.Dataset],
-    minio_endpoint: str = "http://192.168.49.1:9000",
-    minio_access_key: str = "minioadmin",
-    minio_secret_key: str = "minioadmin",
-):
-    """Great Expectations DQ gate — downloads parquet from MinIO then validates."""
-    import os
-    import pathlib
-
+def dq_op(data_dir: str, processed: dsl.Input[dsl.Dataset]):
+    """Download cleaned parquet from MinIO → run Great Expectations."""
+    import os, pathlib
     os.environ["DATA_DIR"] = data_dir
-    os.environ["MINIO_ENDPOINT"] = minio_endpoint
-    os.environ["MINIO_ACCESS_KEY"] = minio_access_key
-    os.environ["MINIO_SECRET_KEY"] = minio_secret_key
-
-    parquet_local = pathlib.Path(data_dir) / "processed" / "cleaned_products.parquet"
-    if not parquet_local.exists():
-        parquet_local.parent.mkdir(parents=True, exist_ok=True)
+    parquet = pathlib.Path(data_dir) / "processed" / "cleaned_products.parquet"
+    if not parquet.exists():
+        parquet.parent.mkdir(parents=True, exist_ok=True)
         from src.storage.minio_client import _client
-        _client().download_file("processed", "cleaned_products.parquet", str(parquet_local))
-
+        _client().download_file("processed", "cleaned_products.parquet", str(parquet))
     from src.pipeline.dq_step import run_or_raise
-    run_or_raise(parquet_path=str(parquet_local))
+    run_or_raise(parquet_path=str(parquet))
 
 
 @dsl.component(base_image=_IMAGE)
@@ -65,119 +61,197 @@ def features_op(
     processed: dsl.Input[dsl.Dataset],
     features: dsl.Output[dsl.Dataset],
 ):
-    import os
-
+    """Download cleaned parquet → build features → upload features parquet."""
+    import os, pathlib
     os.environ["DATA_DIR"] = data_dir
-    from src.features.build_features import run
+    p_dir = pathlib.Path(data_dir) / "processed"
+    p_dir.mkdir(parents=True, exist_ok=True)
 
+    from src.storage.minio_client import _client
+    c = _client()
+    c.download_file("processed", "cleaned_products.parquet",
+                    str(p_dir / "cleaned_products.parquet"))
+
+    from src.features.build_features import run
     run()
+
+    c.upload_file(str(p_dir / "features.parquet"), "processed", "features.parquet")
     features.metadata["data_dir"] = data_dir
 
 
 @dsl.component(base_image=_IMAGE)
 def score_op(data_dir: str, features: dsl.Input[dsl.Dataset]):
-    import os
-
+    """Download features → score → upload topk CSVs."""
+    import os, pathlib
     os.environ["DATA_DIR"] = data_dir
-    from src.scoring.topk import run
+    p_dir = pathlib.Path(data_dir) / "processed"
+    p_dir.mkdir(parents=True, exist_ok=True)
+    a_dir = pathlib.Path(data_dir) / "analytics"
+    a_dir.mkdir(parents=True, exist_ok=True)
 
+    from src.storage.minio_client import _client
+    c = _client()
+    c.download_file("processed", "features.parquet", str(p_dir / "features.parquet"))
+
+    from src.scoring.topk import run
     run()
+
+    for fname in ["topk_products.csv", "topk_per_category.csv", "topk_per_shop.csv"]:
+        if (a_dir / fname).exists():
+            c.upload_file(str(a_dir / fname), "processed", f"analytics/{fname}")
 
 
 @dsl.component(base_image=_IMAGE)
 def train_classifier_op(data_dir: str, features: dsl.Input[dsl.Dataset]):
-    import os
-
+    """Download features → train RF → log to MLflow → upload model to MinIO."""
+    import os, pathlib
     os.environ["DATA_DIR"] = data_dir
-    from src.ml.train_classifier import run
+    p_dir = pathlib.Path(data_dir) / "processed"
+    p_dir.mkdir(parents=True, exist_ok=True)
+    pathlib.Path(data_dir, "models").mkdir(parents=True, exist_ok=True)
+    pathlib.Path(data_dir, "analytics").mkdir(parents=True, exist_ok=True)
 
+    from src.storage.minio_client import _client
+    _client().download_file("processed", "features.parquet", str(p_dir / "features.parquet"))
+
+    from src.ml.train_classifier import run
     run()
 
 
 @dsl.component(base_image=_IMAGE)
 def train_xgboost_op(data_dir: str, features: dsl.Input[dsl.Dataset]):
-    import os
-
+    """Download features → train XGBoost → log to MLflow → upload model to MinIO."""
+    import os, pathlib
     os.environ["DATA_DIR"] = data_dir
-    from src.ml.train_xgboost import run
+    p_dir = pathlib.Path(data_dir) / "processed"
+    p_dir.mkdir(parents=True, exist_ok=True)
+    pathlib.Path(data_dir, "models").mkdir(parents=True, exist_ok=True)
+    pathlib.Path(data_dir, "analytics").mkdir(parents=True, exist_ok=True)
 
+    from src.storage.minio_client import _client
+    _client().download_file("processed", "features.parquet", str(p_dir / "features.parquet"))
+
+    from src.ml.train_xgboost import run
     run()
 
 
 @dsl.component(base_image=_IMAGE)
 def cluster_kmeans_op(data_dir: str, features: dsl.Input[dsl.Dataset]):
-    import os
-
+    """Download features → KMeans clustering → upload clusters CSV."""
+    import os, pathlib
     os.environ["DATA_DIR"] = data_dir
-    from src.ml.cluster_products import run
+    p_dir = pathlib.Path(data_dir) / "processed"
+    p_dir.mkdir(parents=True, exist_ok=True)
+    a_dir = pathlib.Path(data_dir) / "analytics"
+    a_dir.mkdir(parents=True, exist_ok=True)
 
+    from src.storage.minio_client import _client
+    c = _client()
+    c.download_file("processed", "features.parquet", str(p_dir / "features.parquet"))
+
+    from src.ml.cluster_products import run
     run()
+
+    for fname in ["clusters.csv", "pca_viz.csv", "cluster_metrics.json"]:
+        if (a_dir / fname).exists():
+            c.upload_file(str(a_dir / fname), "processed", f"analytics/{fname}")
 
 
 @dsl.component(base_image=_IMAGE)
 def cluster_dbscan_op(data_dir: str, features: dsl.Input[dsl.Dataset]):
-    import os
-
+    """Download features → DBSCAN clustering → upload results."""
+    import os, pathlib
     os.environ["DATA_DIR"] = data_dir
-    from src.ml.dbscan_products import run
+    p_dir = pathlib.Path(data_dir) / "processed"
+    p_dir.mkdir(parents=True, exist_ok=True)
+    a_dir = pathlib.Path(data_dir) / "analytics"
+    a_dir.mkdir(parents=True, exist_ok=True)
 
+    from src.storage.minio_client import _client
+    c = _client()
+    c.download_file("processed", "features.parquet", str(p_dir / "features.parquet"))
+
+    from src.ml.dbscan_products import run
     run()
+
+    if (a_dir / "dbscan_clusters.csv").exists():
+        c.upload_file(str(a_dir / "dbscan_clusters.csv"), "processed",
+                      "analytics/dbscan_clusters.csv")
 
 
 @dsl.component(base_image=_IMAGE)
 def association_rules_op(data_dir: str, features: dsl.Input[dsl.Dataset]):
-    import os
-
+    """Download features → mine association rules → upload CSV."""
+    import os, pathlib
     os.environ["DATA_DIR"] = data_dir
-    from src.ml.rules import run
+    p_dir = pathlib.Path(data_dir) / "processed"
+    p_dir.mkdir(parents=True, exist_ok=True)
+    a_dir = pathlib.Path(data_dir) / "analytics"
+    a_dir.mkdir(parents=True, exist_ok=True)
 
+    from src.storage.minio_client import _client
+    c = _client()
+    c.download_file("processed", "features.parquet", str(p_dir / "features.parquet"))
+
+    from src.ml.rules import run
     run()
+
+    if (a_dir / "association_rules.csv").exists():
+        c.upload_file(str(a_dir / "association_rules.csv"), "processed",
+                      "analytics/association_rules.csv")
 
 
 @dsl.pipeline(
     name="prism-pipeline",
-    description=(
-        "Full ML/DM pipeline for eCommerce product analysis. "
-        "Scraping runs as a pre-step; LLM summary via dashboard."
-    ),
+    description="PRISM: preprocess → DQ → features → score + ML → MinIO + MLflow",
 )
 def prism_pipeline(data_dir: str = "/app/data"):
-    """KFP v2 DAG with caching and retry."""
-    p = (
-        preprocess_op(data_dir=data_dir)
-        .set_caching_options(enable_caching=False)
-        .set_retry(num_retries=2)
-    )
+    """KFP v2 DAG. All pods wired to host MinIO (192.168.49.1:9000) + MLflow."""
+    _MINIO = "http://192.168.49.1:9000"
+    _MLFLOW = "http://192.168.49.1:5000"
+    _KEY = "minioadmin"
 
-    dq = (
-        dq_op(data_dir=data_dir, processed=p.outputs["processed"])
-        .set_caching_options(enable_caching=False)
-        .set_retry(num_retries=1)
-    )
+    def _wire(task):
+        return (
+            task
+            .set_env_variable("MINIO_ENDPOINT", _MINIO)
+            .set_env_variable("MINIO_ACCESS_KEY", _KEY)
+            .set_env_variable("MINIO_SECRET_KEY", _KEY)
+            .set_env_variable("AWS_ACCESS_KEY_ID", _KEY)
+            .set_env_variable("AWS_SECRET_ACCESS_KEY", _KEY)
+            .set_env_variable("MLFLOW_S3_ENDPOINT_URL", _MINIO)
+            .set_env_variable("MLFLOW_TRACKING_URI", _MLFLOW)
+            .set_env_variable("GIT_PYTHON_REFRESH", "quiet")
+        )
 
-    f = (
-        features_op(data_dir=data_dir, processed=p.outputs["processed"])
-        .after(dq)
-        .set_caching_options(enable_caching=True)
-        .set_retry(num_retries=2)
-    )
+    p = _wire(preprocess_op(data_dir=data_dir)
+              .set_caching_options(enable_caching=False).set_retry(num_retries=2))
 
-    s = (
-        score_op(data_dir=data_dir, features=f.outputs["features"])
-        .set_caching_options(enable_caching=True)
-        .set_retry(num_retries=2)
-    )
+    dq = _wire(dq_op(data_dir=data_dir, processed=p.outputs["processed"])
+               .set_caching_options(enable_caching=False).set_retry(num_retries=1))
 
-    train_classifier_op(data_dir=data_dir, features=f.outputs["features"]).after(s).set_caching_options(enable_caching=True).set_retry(num_retries=2)
-    train_xgboost_op(data_dir=data_dir, features=f.outputs["features"]).after(s).set_caching_options(enable_caching=True).set_retry(num_retries=2)
-    cluster_kmeans_op(data_dir=data_dir, features=f.outputs["features"]).set_caching_options(enable_caching=True).set_retry(num_retries=2)
-    cluster_dbscan_op(data_dir=data_dir, features=f.outputs["features"]).set_caching_options(enable_caching=True).set_retry(num_retries=2)
-    association_rules_op(data_dir=data_dir, features=f.outputs["features"]).set_caching_options(enable_caching=True).set_retry(num_retries=2)
+    f = _wire(features_op(data_dir=data_dir, processed=p.outputs["processed"])
+              .after(dq)
+              .set_caching_options(enable_caching=False).set_retry(num_retries=2))
+
+    s = _wire(score_op(data_dir=data_dir, features=f.outputs["features"])
+              .set_caching_options(enable_caching=False).set_retry(num_retries=2))
+
+    _wire(train_classifier_op(data_dir=data_dir, features=f.outputs["features"])
+          .after(s).set_caching_options(enable_caching=False).set_retry(num_retries=2))
+    _wire(train_xgboost_op(data_dir=data_dir, features=f.outputs["features"])
+          .after(s).set_caching_options(enable_caching=False).set_retry(num_retries=2))
+    _wire(cluster_kmeans_op(data_dir=data_dir, features=f.outputs["features"])
+          .set_caching_options(enable_caching=False).set_retry(num_retries=2))
+    _wire(cluster_dbscan_op(data_dir=data_dir, features=f.outputs["features"])
+          .set_caching_options(enable_caching=False).set_retry(num_retries=2))
+    _wire(association_rules_op(data_dir=data_dir, features=f.outputs["features"])
+          .set_caching_options(enable_caching=False).set_retry(num_retries=2))
+
 
 def run() -> None:
-    """Entry point used when calling this module as a script."""
     print(
         "Kubeflow pipeline defined as `prism_pipeline`.\n"
         "Compile: make compile-kfp\n"
-        "Run:     make kfp-operator-deploy"
+        "Run:     upload kubeflow_prism_pipeline.yaml to http://localhost:8080"
     )

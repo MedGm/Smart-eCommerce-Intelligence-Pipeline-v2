@@ -1,6 +1,6 @@
 # PIPELINE DEFINITION
 # Name: prism-pipeline
-# Description: Full ML/DM pipeline for eCommerce product analysis. Scraping runs as a pre-step; LLM summary via dashboard.
+# Description: PRISM: preprocess → DQ → features → score + ML → MinIO + MLflow
 # Inputs:
 #    data_dir: str [Default: '/app/data']
 components:
@@ -47,18 +47,6 @@ components:
             schemaVersion: 0.0.1
       parameters:
         data_dir:
-          parameterType: STRING
-        minio_access_key:
-          defaultValue: minioadmin
-          isOptional: true
-          parameterType: STRING
-        minio_endpoint:
-          defaultValue: http://192.168.49.1:9000
-          isOptional: true
-          parameterType: STRING
-        minio_secret_key:
-          defaultValue: minioadmin
-          isOptional: true
           parameterType: STRING
   comp-features-op:
     executorLabel: exec-features-op
@@ -151,8 +139,33 @@ deploymentSpec:
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
           \ *\n\ndef association_rules_op(data_dir: str, features: dsl.Input[dsl.Dataset]):\n\
-          \    import os\n\n    os.environ[\"DATA_DIR\"] = data_dir\n    from src.ml.rules\
-          \ import run\n\n    run()\n\n"
+          \    \"\"\"Download features \u2192 mine association rules \u2192 upload\
+          \ CSV.\"\"\"\n    import os, pathlib\n    os.environ[\"DATA_DIR\"] = data_dir\n\
+          \    p_dir = pathlib.Path(data_dir) / \"processed\"\n    p_dir.mkdir(parents=True,\
+          \ exist_ok=True)\n    a_dir = pathlib.Path(data_dir) / \"analytics\"\n \
+          \   a_dir.mkdir(parents=True, exist_ok=True)\n\n    from src.storage.minio_client\
+          \ import _client\n    c = _client()\n    c.download_file(\"processed\",\
+          \ \"features.parquet\", str(p_dir / \"features.parquet\"))\n\n    from src.ml.rules\
+          \ import run\n    run()\n\n    if (a_dir / \"association_rules.csv\").exists():\n\
+          \        c.upload_file(str(a_dir / \"association_rules.csv\"), \"processed\"\
+          ,\n                      \"analytics/association_rules.csv\")\n\n"
+        env:
+        - name: MINIO_ENDPOINT
+          value: http://192.168.49.1:9000
+        - name: MINIO_ACCESS_KEY
+          value: minioadmin
+        - name: MINIO_SECRET_KEY
+          value: minioadmin
+        - name: AWS_ACCESS_KEY_ID
+          value: minioadmin
+        - name: AWS_SECRET_ACCESS_KEY
+          value: minioadmin
+        - name: MLFLOW_S3_ENDPOINT_URL
+          value: http://192.168.49.1:9000
+        - name: MLFLOW_TRACKING_URI
+          value: http://192.168.49.1:5000
+        - name: GIT_PYTHON_REFRESH
+          value: quiet
         image: prism-app:local
     exec-cluster-dbscan-op:
       container:
@@ -181,8 +194,33 @@ deploymentSpec:
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
           \ *\n\ndef cluster_dbscan_op(data_dir: str, features: dsl.Input[dsl.Dataset]):\n\
-          \    import os\n\n    os.environ[\"DATA_DIR\"] = data_dir\n    from src.ml.dbscan_products\
-          \ import run\n\n    run()\n\n"
+          \    \"\"\"Download features \u2192 DBSCAN clustering \u2192 upload results.\"\
+          \"\"\n    import os, pathlib\n    os.environ[\"DATA_DIR\"] = data_dir\n\
+          \    p_dir = pathlib.Path(data_dir) / \"processed\"\n    p_dir.mkdir(parents=True,\
+          \ exist_ok=True)\n    a_dir = pathlib.Path(data_dir) / \"analytics\"\n \
+          \   a_dir.mkdir(parents=True, exist_ok=True)\n\n    from src.storage.minio_client\
+          \ import _client\n    c = _client()\n    c.download_file(\"processed\",\
+          \ \"features.parquet\", str(p_dir / \"features.parquet\"))\n\n    from src.ml.dbscan_products\
+          \ import run\n    run()\n\n    if (a_dir / \"dbscan_clusters.csv\").exists():\n\
+          \        c.upload_file(str(a_dir / \"dbscan_clusters.csv\"), \"processed\"\
+          ,\n                      \"analytics/dbscan_clusters.csv\")\n\n"
+        env:
+        - name: MINIO_ENDPOINT
+          value: http://192.168.49.1:9000
+        - name: MINIO_ACCESS_KEY
+          value: minioadmin
+        - name: MINIO_SECRET_KEY
+          value: minioadmin
+        - name: AWS_ACCESS_KEY_ID
+          value: minioadmin
+        - name: AWS_SECRET_ACCESS_KEY
+          value: minioadmin
+        - name: MLFLOW_S3_ENDPOINT_URL
+          value: http://192.168.49.1:9000
+        - name: MLFLOW_TRACKING_URI
+          value: http://192.168.49.1:5000
+        - name: GIT_PYTHON_REFRESH
+          value: quiet
         image: prism-app:local
     exec-cluster-kmeans-op:
       container:
@@ -211,8 +249,34 @@ deploymentSpec:
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
           \ *\n\ndef cluster_kmeans_op(data_dir: str, features: dsl.Input[dsl.Dataset]):\n\
-          \    import os\n\n    os.environ[\"DATA_DIR\"] = data_dir\n    from src.ml.cluster_products\
-          \ import run\n\n    run()\n\n"
+          \    \"\"\"Download features \u2192 KMeans clustering \u2192 upload clusters\
+          \ CSV.\"\"\"\n    import os, pathlib\n    os.environ[\"DATA_DIR\"] = data_dir\n\
+          \    p_dir = pathlib.Path(data_dir) / \"processed\"\n    p_dir.mkdir(parents=True,\
+          \ exist_ok=True)\n    a_dir = pathlib.Path(data_dir) / \"analytics\"\n \
+          \   a_dir.mkdir(parents=True, exist_ok=True)\n\n    from src.storage.minio_client\
+          \ import _client\n    c = _client()\n    c.download_file(\"processed\",\
+          \ \"features.parquet\", str(p_dir / \"features.parquet\"))\n\n    from src.ml.cluster_products\
+          \ import run\n    run()\n\n    for fname in [\"clusters.csv\", \"pca_viz.csv\"\
+          , \"cluster_metrics.json\"]:\n        if (a_dir / fname).exists():\n   \
+          \         c.upload_file(str(a_dir / fname), \"processed\", f\"analytics/{fname}\"\
+          )\n\n"
+        env:
+        - name: MINIO_ENDPOINT
+          value: http://192.168.49.1:9000
+        - name: MINIO_ACCESS_KEY
+          value: minioadmin
+        - name: MINIO_SECRET_KEY
+          value: minioadmin
+        - name: AWS_ACCESS_KEY_ID
+          value: minioadmin
+        - name: AWS_SECRET_ACCESS_KEY
+          value: minioadmin
+        - name: MLFLOW_S3_ENDPOINT_URL
+          value: http://192.168.49.1:9000
+        - name: MLFLOW_TRACKING_URI
+          value: http://192.168.49.1:5000
+        - name: GIT_PYTHON_REFRESH
+          value: quiet
         image: prism-app:local
     exec-dq-op:
       container:
@@ -240,20 +304,32 @@ deploymentSpec:
 
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef dq_op(\n    data_dir: str,\n    processed: dsl.Input[dsl.Dataset],\n\
-          \    minio_endpoint: str = \"http://192.168.49.1:9000\",\n    minio_access_key:\
-          \ str = \"minioadmin\",\n    minio_secret_key: str = \"minioadmin\",\n):\n\
-          \    \"\"\"Great Expectations DQ gate \u2014 downloads parquet from MinIO\
-          \ then validates.\"\"\"\n    import os\n    import pathlib\n\n    os.environ[\"\
-          DATA_DIR\"] = data_dir\n    os.environ[\"MINIO_ENDPOINT\"] = minio_endpoint\n\
-          \    os.environ[\"MINIO_ACCESS_KEY\"] = minio_access_key\n    os.environ[\"\
-          MINIO_SECRET_KEY\"] = minio_secret_key\n\n    parquet_local = pathlib.Path(data_dir)\
-          \ / \"processed\" / \"cleaned_products.parquet\"\n    if not parquet_local.exists():\n\
-          \        parquet_local.parent.mkdir(parents=True, exist_ok=True)\n     \
-          \   from src.storage.minio_client import _client\n        _client().download_file(\"\
-          processed\", \"cleaned_products.parquet\", str(parquet_local))\n\n    from\
-          \ src.pipeline.dq_step import run_or_raise\n    run_or_raise(parquet_path=str(parquet_local))\n\
-          \n"
+          \ *\n\ndef dq_op(data_dir: str, processed: dsl.Input[dsl.Dataset]):\n  \
+          \  \"\"\"Download cleaned parquet from MinIO \u2192 run Great Expectations.\"\
+          \"\"\n    import os, pathlib\n    os.environ[\"DATA_DIR\"] = data_dir\n\
+          \    parquet = pathlib.Path(data_dir) / \"processed\" / \"cleaned_products.parquet\"\
+          \n    if not parquet.exists():\n        parquet.parent.mkdir(parents=True,\
+          \ exist_ok=True)\n        from src.storage.minio_client import _client\n\
+          \        _client().download_file(\"processed\", \"cleaned_products.parquet\"\
+          , str(parquet))\n    from src.pipeline.dq_step import run_or_raise\n   \
+          \ run_or_raise(parquet_path=str(parquet))\n\n"
+        env:
+        - name: MINIO_ENDPOINT
+          value: http://192.168.49.1:9000
+        - name: MINIO_ACCESS_KEY
+          value: minioadmin
+        - name: MINIO_SECRET_KEY
+          value: minioadmin
+        - name: AWS_ACCESS_KEY_ID
+          value: minioadmin
+        - name: AWS_SECRET_ACCESS_KEY
+          value: minioadmin
+        - name: MLFLOW_S3_ENDPOINT_URL
+          value: http://192.168.49.1:9000
+        - name: MLFLOW_TRACKING_URI
+          value: http://192.168.49.1:5000
+        - name: GIT_PYTHON_REFRESH
+          value: quiet
         image: prism-app:local
     exec-features-op:
       container:
@@ -282,9 +358,33 @@ deploymentSpec:
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
           \ *\n\ndef features_op(\n    data_dir: str,\n    processed: dsl.Input[dsl.Dataset],\n\
-          \    features: dsl.Output[dsl.Dataset],\n):\n    import os\n\n    os.environ[\"\
-          DATA_DIR\"] = data_dir\n    from src.features.build_features import run\n\
-          \n    run()\n    features.metadata[\"data_dir\"] = data_dir\n\n"
+          \    features: dsl.Output[dsl.Dataset],\n):\n    \"\"\"Download cleaned\
+          \ parquet \u2192 build features \u2192 upload features parquet.\"\"\"\n\
+          \    import os, pathlib\n    os.environ[\"DATA_DIR\"] = data_dir\n    p_dir\
+          \ = pathlib.Path(data_dir) / \"processed\"\n    p_dir.mkdir(parents=True,\
+          \ exist_ok=True)\n\n    from src.storage.minio_client import _client\n \
+          \   c = _client()\n    c.download_file(\"processed\", \"cleaned_products.parquet\"\
+          ,\n                    str(p_dir / \"cleaned_products.parquet\"))\n\n  \
+          \  from src.features.build_features import run\n    run()\n\n    c.upload_file(str(p_dir\
+          \ / \"features.parquet\"), \"processed\", \"features.parquet\")\n    features.metadata[\"\
+          data_dir\"] = data_dir\n\n"
+        env:
+        - name: MINIO_ENDPOINT
+          value: http://192.168.49.1:9000
+        - name: MINIO_ACCESS_KEY
+          value: minioadmin
+        - name: MINIO_SECRET_KEY
+          value: minioadmin
+        - name: AWS_ACCESS_KEY_ID
+          value: minioadmin
+        - name: AWS_SECRET_ACCESS_KEY
+          value: minioadmin
+        - name: MLFLOW_S3_ENDPOINT_URL
+          value: http://192.168.49.1:9000
+        - name: MLFLOW_TRACKING_URI
+          value: http://192.168.49.1:5000
+        - name: GIT_PYTHON_REFRESH
+          value: quiet
         image: prism-app:local
     exec-preprocess-op:
       container:
@@ -312,10 +412,28 @@ deploymentSpec:
 
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef preprocess_op(\n    data_dir: str,\n    processed: dsl.Output[dsl.Dataset],\n\
-          ):\n    import os\n\n    os.environ[\"DATA_DIR\"] = data_dir\n    from src.preprocessing.run\
-          \ import run\n\n    run()\n    processed.metadata[\"data_dir\"] = data_dir\n\
-          \n"
+          \ *\n\ndef preprocess_op(data_dir: str, processed: dsl.Output[dsl.Dataset]):\n\
+          \    \"\"\"Sync raw from MinIO \u2192 preprocess \u2192 upload cleaned parquet.\"\
+          \"\"\n    import os\n    os.environ[\"DATA_DIR\"] = data_dir\n    from src.preprocessing.run\
+          \ import run\n    run()  # internally syncs raw from MinIO + uploads processed\n\
+          \    processed.metadata[\"data_dir\"] = data_dir\n\n"
+        env:
+        - name: MINIO_ENDPOINT
+          value: http://192.168.49.1:9000
+        - name: MINIO_ACCESS_KEY
+          value: minioadmin
+        - name: MINIO_SECRET_KEY
+          value: minioadmin
+        - name: AWS_ACCESS_KEY_ID
+          value: minioadmin
+        - name: AWS_SECRET_ACCESS_KEY
+          value: minioadmin
+        - name: MLFLOW_S3_ENDPOINT_URL
+          value: http://192.168.49.1:9000
+        - name: MLFLOW_TRACKING_URI
+          value: http://192.168.49.1:5000
+        - name: GIT_PYTHON_REFRESH
+          value: quiet
         image: prism-app:local
     exec-score-op:
       container:
@@ -344,8 +462,34 @@ deploymentSpec:
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
           \ *\n\ndef score_op(data_dir: str, features: dsl.Input[dsl.Dataset]):\n\
-          \    import os\n\n    os.environ[\"DATA_DIR\"] = data_dir\n    from src.scoring.topk\
-          \ import run\n\n    run()\n\n"
+          \    \"\"\"Download features \u2192 score \u2192 upload topk CSVs.\"\"\"\
+          \n    import os, pathlib\n    os.environ[\"DATA_DIR\"] = data_dir\n    p_dir\
+          \ = pathlib.Path(data_dir) / \"processed\"\n    p_dir.mkdir(parents=True,\
+          \ exist_ok=True)\n    a_dir = pathlib.Path(data_dir) / \"analytics\"\n \
+          \   a_dir.mkdir(parents=True, exist_ok=True)\n\n    from src.storage.minio_client\
+          \ import _client\n    c = _client()\n    c.download_file(\"processed\",\
+          \ \"features.parquet\", str(p_dir / \"features.parquet\"))\n\n    from src.scoring.topk\
+          \ import run\n    run()\n\n    for fname in [\"topk_products.csv\", \"topk_per_category.csv\"\
+          , \"topk_per_shop.csv\"]:\n        if (a_dir / fname).exists():\n      \
+          \      c.upload_file(str(a_dir / fname), \"processed\", f\"analytics/{fname}\"\
+          )\n\n"
+        env:
+        - name: MINIO_ENDPOINT
+          value: http://192.168.49.1:9000
+        - name: MINIO_ACCESS_KEY
+          value: minioadmin
+        - name: MINIO_SECRET_KEY
+          value: minioadmin
+        - name: AWS_ACCESS_KEY_ID
+          value: minioadmin
+        - name: AWS_SECRET_ACCESS_KEY
+          value: minioadmin
+        - name: MLFLOW_S3_ENDPOINT_URL
+          value: http://192.168.49.1:9000
+        - name: MLFLOW_TRACKING_URI
+          value: http://192.168.49.1:5000
+        - name: GIT_PYTHON_REFRESH
+          value: quiet
         image: prism-app:local
     exec-train-classifier-op:
       container:
@@ -374,8 +518,32 @@ deploymentSpec:
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
           \ *\n\ndef train_classifier_op(data_dir: str, features: dsl.Input[dsl.Dataset]):\n\
-          \    import os\n\n    os.environ[\"DATA_DIR\"] = data_dir\n    from src.ml.train_classifier\
-          \ import run\n\n    run()\n\n"
+          \    \"\"\"Download features \u2192 train RF \u2192 log to MLflow \u2192\
+          \ upload model to MinIO.\"\"\"\n    import os, pathlib\n    os.environ[\"\
+          DATA_DIR\"] = data_dir\n    p_dir = pathlib.Path(data_dir) / \"processed\"\
+          \n    p_dir.mkdir(parents=True, exist_ok=True)\n    pathlib.Path(data_dir,\
+          \ \"models\").mkdir(parents=True, exist_ok=True)\n    pathlib.Path(data_dir,\
+          \ \"analytics\").mkdir(parents=True, exist_ok=True)\n\n    from src.storage.minio_client\
+          \ import _client\n    _client().download_file(\"processed\", \"features.parquet\"\
+          , str(p_dir / \"features.parquet\"))\n\n    from src.ml.train_classifier\
+          \ import run\n    run()\n\n"
+        env:
+        - name: MINIO_ENDPOINT
+          value: http://192.168.49.1:9000
+        - name: MINIO_ACCESS_KEY
+          value: minioadmin
+        - name: MINIO_SECRET_KEY
+          value: minioadmin
+        - name: AWS_ACCESS_KEY_ID
+          value: minioadmin
+        - name: AWS_SECRET_ACCESS_KEY
+          value: minioadmin
+        - name: MLFLOW_S3_ENDPOINT_URL
+          value: http://192.168.49.1:9000
+        - name: MLFLOW_TRACKING_URI
+          value: http://192.168.49.1:5000
+        - name: GIT_PYTHON_REFRESH
+          value: quiet
         image: prism-app:local
     exec-train-xgboost-op:
       container:
@@ -404,19 +572,42 @@ deploymentSpec:
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
           \ *\n\ndef train_xgboost_op(data_dir: str, features: dsl.Input[dsl.Dataset]):\n\
-          \    import os\n\n    os.environ[\"DATA_DIR\"] = data_dir\n    from src.ml.train_xgboost\
-          \ import run\n\n    run()\n\n"
+          \    \"\"\"Download features \u2192 train XGBoost \u2192 log to MLflow \u2192\
+          \ upload model to MinIO.\"\"\"\n    import os, pathlib\n    os.environ[\"\
+          DATA_DIR\"] = data_dir\n    p_dir = pathlib.Path(data_dir) / \"processed\"\
+          \n    p_dir.mkdir(parents=True, exist_ok=True)\n    pathlib.Path(data_dir,\
+          \ \"models\").mkdir(parents=True, exist_ok=True)\n    pathlib.Path(data_dir,\
+          \ \"analytics\").mkdir(parents=True, exist_ok=True)\n\n    from src.storage.minio_client\
+          \ import _client\n    _client().download_file(\"processed\", \"features.parquet\"\
+          , str(p_dir / \"features.parquet\"))\n\n    from src.ml.train_xgboost import\
+          \ run\n    run()\n\n"
+        env:
+        - name: MINIO_ENDPOINT
+          value: http://192.168.49.1:9000
+        - name: MINIO_ACCESS_KEY
+          value: minioadmin
+        - name: MINIO_SECRET_KEY
+          value: minioadmin
+        - name: AWS_ACCESS_KEY_ID
+          value: minioadmin
+        - name: AWS_SECRET_ACCESS_KEY
+          value: minioadmin
+        - name: MLFLOW_S3_ENDPOINT_URL
+          value: http://192.168.49.1:9000
+        - name: MLFLOW_TRACKING_URI
+          value: http://192.168.49.1:5000
+        - name: GIT_PYTHON_REFRESH
+          value: quiet
         image: prism-app:local
 pipelineInfo:
-  description: Full ML/DM pipeline for eCommerce product analysis. Scraping runs as
-    a pre-step; LLM summary via dashboard.
+  description: "PRISM: preprocess \u2192 DQ \u2192 features \u2192 score + ML \u2192\
+    \ MinIO + MLflow"
   name: prism-pipeline
 root:
   dag:
     tasks:
       association-rules-op:
-        cachingOptions:
-          enableCache: true
+        cachingOptions: {}
         componentRef:
           name: comp-association-rules-op
         dependentTasks:
@@ -438,8 +629,7 @@ root:
         taskInfo:
           name: association-rules-op
       cluster-dbscan-op:
-        cachingOptions:
-          enableCache: true
+        cachingOptions: {}
         componentRef:
           name: comp-cluster-dbscan-op
         dependentTasks:
@@ -461,8 +651,7 @@ root:
         taskInfo:
           name: cluster-dbscan-op
       cluster-kmeans-op:
-        cachingOptions:
-          enableCache: true
+        cachingOptions: {}
         componentRef:
           name: comp-cluster-kmeans-op
         dependentTasks:
@@ -506,8 +695,7 @@ root:
         taskInfo:
           name: dq-op
       features-op:
-        cachingOptions:
-          enableCache: true
+        cachingOptions: {}
         componentRef:
           name: comp-features-op
         dependentTasks:
@@ -545,8 +733,7 @@ root:
         taskInfo:
           name: preprocess-op
       score-op:
-        cachingOptions:
-          enableCache: true
+        cachingOptions: {}
         componentRef:
           name: comp-score-op
         dependentTasks:
@@ -568,8 +755,7 @@ root:
         taskInfo:
           name: score-op
       train-classifier-op:
-        cachingOptions:
-          enableCache: true
+        cachingOptions: {}
         componentRef:
           name: comp-train-classifier-op
         dependentTasks:
@@ -592,8 +778,7 @@ root:
         taskInfo:
           name: train-classifier-op
       train-xgboost-op:
-        cachingOptions:
-          enableCache: true
+        cachingOptions: {}
         componentRef:
           name: comp-train-xgboost-op
         dependentTasks:

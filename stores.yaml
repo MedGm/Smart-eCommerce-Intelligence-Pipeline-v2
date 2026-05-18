@@ -1,30 +1,49 @@
-# Store catalog for the PRISM scraping pipeline.
-# Add/remove stores here without touching Python code.
+# Store catalog for the PRISM scraping pipeline - Tech & IT focused
 
 shopify:
-  - url: https://www.deathwishcoffee.com
-    name: Death Wish Coffee
+  - url: https://ohsnap.com
+    name: Ohsnap
     geography: US
     collections: [all]
-    max_collection_pages: 1
+    max_collection_pages: 2
 
-  - url: https://www.goattape.com
-    name: Goat Tape
+  - url: https://www.keychron.com
+    name: Keychron
     geography: US
     collections: [all]
-    max_collection_pages: 1
+    max_collection_pages: 2
 
-  - url: https://www.tenthousand.cc
-    name: Ten Thousand
+  - url: https://hyperx.com
+    name: HyperX
+    geography: US
+    collections: [all]
+    max_collection_pages: 2
+
+  - url: https://www.wyze.com
+    name: Wyze
+    geography: US
+    collections: [all]
+    max_collection_pages: 2
+
+  - url: https://www.skullcandy.com
+    name: Skullcandy
+    geography: US
+    collections: [all]
+    max_collection_pages: 2
+
+  - url: https://plug.tech
+    name: Plug Tech
+    geography: US
+    collections: [all]
+    max_collection_pages: 2
+
+  - url: https://www.twelvesouth.com
+    name: Twelve South
     geography: US
     collections: [all]
     max_collection_pages: 2
 
 woocommerce:
-  - url: https://danosseasoning.com
-    name: Dan-O's Seasoning
-    geography: US
-
-  - url: https://www.nutribullet.com
-    name: NutriBullet
+  - url: https://lian-li.com
+    name: Lian Li
     geography: US
