@@ -4,7 +4,7 @@
 #   (no profile) app: universal runner — use with `docker compose run --rm app <cmd>`
 #   infra        : MinIO (object storage) + MLflow (experiment tracking)
 #   pipeline     : full pipeline run wired to infra
-#   dashboard    : Streamlit BI dashboard wired to infra
+#   dashboard    : FastAPI SPA dashboard wired to infra
 #
 # Typical usage
 #   docker compose build                                              # build app image
@@ -119,13 +119,14 @@ services:
     command: ["python", "-m", "src.pipeline.local_pipeline"]
     profiles: [pipeline]
 
-  # ── Streamlit BI dashboard ────────────────────────────────────────────────
+  # ── FastAPI SPA dashboard ────────────────────────────────────────────────
   dashboard:
     build: .
     ports:
       - "8501:8501"   # →  http://localhost:8501
     volumes:
       - ./data:/app/data
+      - .:/app
     env_file:
       - path: .env
         required: false
@@ -137,11 +138,11 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MLFLOW_TRACKING_URI: http://mlflow:5000
     command:
-      - streamlit
-      - run
-      - src/dashboard/app.py
-      - --server.port=8501
-      - --server.address=0.0.0.0
+      - uvicorn
+      - src.api.main:app
+      - --host=0.0.0.0
+      - --port=8501
+      - --reload
     profiles: [dashboard]
 
   # ── Apache Superset BI dashboard ─────────────────────────────────────────────
