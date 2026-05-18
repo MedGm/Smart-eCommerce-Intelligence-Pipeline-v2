@@ -1,1 +1,454 @@
-<!DOCTYPE html><html><body>PRISM</body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PRISM — Product Intelligence</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            prism: { bg: '#0C1117', card: '#161B22', border: '#30363D',
+                     gold: '#D6A85F', muted: '#8B949E', text: '#F0E6D3' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .bar { transition: width 0.6s ease; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #161B22; }
+    ::-webkit-scrollbar-thumb { background: #30363D; border-radius: 3px; }
+    .chat-bubble { animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+  </style>
+</head>
+<body class="bg-prism-bg text-prism-text min-h-screen flex" x-data="prism()" x-init="init()" x-cloak>
+
+  <!-- ── Sidebar ──────────────────────────────────────────────────── -->
+  <aside class="w-52 bg-prism-card border-r border-prism-border flex flex-col p-4 gap-1 shrink-0">
+    <div class="text-2xl font-bold text-prism-gold tracking-tight mb-6 mt-2">PRISM</div>
+
+    <template x-for="tab in tabs" :key="tab.id">
+      <button
+        @click="page = tab.id; if(tab.id === 'dashboard') loadDashboard(); if(tab.id === 'analytics') loadAnalytics();"
+        :class="page === tab.id ? 'bg-prism-gold/10 text-prism-gold border-prism-gold' : 'text-prism-muted border-transparent hover:text-prism-text hover:bg-white/5'"
+        class="flex items-center gap-3 px-3 py-2 rounded-lg border text-sm font-medium text-left transition-all"
+      >
+        <span x-text="tab.icon" class="text-base"></span>
+        <span x-text="tab.label"></span>
+      </button>
+    </template>
+
+    <div class="mt-auto pt-4 border-t border-prism-border">
+      <a href="http://localhost:8088" target="_blank"
+         class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-prism-muted hover:text-prism-gold transition-colors">
+        <span>📊</span> Superset BI ↗
+      </a>
+      <a href="http://localhost:5000" target="_blank"
+         class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-prism-muted hover:text-prism-gold transition-colors">
+        <span>🔬</span> MLflow ↗
+      </a>
+      <a href="http://localhost:9001" target="_blank"
+         class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-prism-muted hover:text-prism-gold transition-colors">
+        <span>🪣</span> MinIO ↗
+      </a>
+    </div>
+  </aside>
+
+  <!-- ── Main ──────────────────────────────────────────────────────── -->
+  <main class="flex-1 overflow-auto">
+
+    <!-- DASHBOARD -->
+    <div x-show="page === 'dashboard'" class="p-6 max-w-6xl mx-auto">
+      <h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+
+      <!-- Stat cards -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-prism-card border border-prism-border rounded-xl p-4">
+          <div class="text-xs text-prism-muted mb-1">Total Products</div>
+          <div class="text-3xl font-bold text-prism-gold" x-text="stats.n_products ?? '—'"></div>
+        </div>
+        <div class="bg-prism-card border border-prism-border rounded-xl p-4">
+          <div class="text-xs text-prism-muted mb-1">Best Shop</div>
+          <div class="text-lg font-semibold truncate" x-text="stats.best_shop || '—'"></div>
+        </div>
+        <div class="bg-prism-card border border-prism-border rounded-xl p-4">
+          <div class="text-xs text-prism-muted mb-1">RF Accuracy</div>
+          <div class="text-3xl font-bold text-green-400"
+               x-text="stats.model_metrics?.accuracy ? (stats.model_metrics.accuracy * 100).toFixed(1) + '%' : '—'"></div>
+        </div>
+        <div class="bg-prism-card border border-prism-border rounded-xl p-4">
+          <div class="text-xs text-prism-muted mb-1">XGB F1</div>
+          <div class="text-3xl font-bold text-blue-400"
+               x-text="stats.model_metrics?.f1_xgboost ? (stats.model_metrics.f1_xgboost * 100).toFixed(1) + '%' : '—'"></div>
+        </div>
+      </div>
+
+      <!-- Top categories mini bar chart -->
+      <div class="bg-prism-card border border-prism-border rounded-xl p-5 mb-6">
+        <h2 class="text-sm font-semibold text-prism-muted mb-4">Top Categories</h2>
+        <div class="space-y-2">
+          <template x-for="cat in stats.top_categories || []" :key="cat.category">
+            <div class="flex items-center gap-3">
+              <div class="w-28 text-xs text-prism-muted truncate" x-text="cat.category"></div>
+              <div class="flex-1 bg-prism-bg rounded-full h-2">
+                <div class="bar bg-prism-gold h-2 rounded-full"
+                     :style="`width: ${Math.min(100, (cat.n / (stats.top_categories[0]?.n || 1)) * 100)}%`"></div>
+              </div>
+              <div class="text-xs text-prism-muted w-8 text-right" x-text="cat.n"></div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Top-K table -->
+      <div class="bg-prism-card border border-prism-border rounded-xl p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold text-prism-muted">Top-K Products</h2>
+          <input x-model="topkFilter" placeholder="Filter…"
+                 class="bg-prism-bg border border-prism-border rounded-lg px-3 py-1 text-sm text-prism-text placeholder-prism-muted focus:outline-none focus:border-prism-gold w-40" />
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-prism-muted text-xs border-b border-prism-border">
+                <th class="text-left py-2 pr-4">Product</th>
+                <th class="text-left py-2 pr-4">Shop</th>
+                <th class="text-left py-2 pr-4">Category</th>
+                <th class="text-right py-2 pr-4">Price</th>
+                <th class="text-right py-2">Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="row in filteredTopk" :key="row.title">
+                <tr class="border-b border-prism-border/50 hover:bg-white/2 transition-colors">
+                  <td class="py-2 pr-4 max-w-xs truncate" x-text="row.title"></td>
+                  <td class="py-2 pr-4 text-prism-muted text-xs" x-text="row.shop_name"></td>
+                  <td class="py-2 pr-4">
+                    <span class="bg-prism-gold/10 text-prism-gold text-xs px-2 py-0.5 rounded-full" x-text="row.category"></span>
+                  </td>
+                  <td class="py-2 pr-4 text-right text-prism-muted" x-text="'$' + (row.price || 0).toFixed(2)"></td>
+                  <td class="py-2 text-right font-mono text-xs text-green-400" x-text="(row.score || 0).toFixed(4)"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+          <div x-show="filteredTopk.length === 0" class="text-center text-prism-muted py-8 text-sm">No products found.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ANALYTICS -->
+    <div x-show="page === 'analytics'" class="p-6 max-w-6xl mx-auto">
+      <h1 class="text-2xl font-bold mb-6">Analytics</h1>
+
+      <div class="grid md:grid-cols-2 gap-6 mb-6">
+        <!-- Clusters -->
+        <div class="bg-prism-card border border-prism-border rounded-xl p-5">
+          <h2 class="text-sm font-semibold text-prism-muted mb-4">KMeans Clusters</h2>
+          <div class="space-y-2">
+            <template x-for="c in clusters" :key="c.cluster">
+              <div class="flex items-center gap-3">
+                <div class="w-16 text-xs text-prism-muted">Cluster <span x-text="c.cluster"></span></div>
+                <div class="flex-1 bg-prism-bg rounded-full h-3">
+                  <div class="bar bg-blue-500 h-3 rounded-full"
+                       :style="`width: ${Math.min(100, (c.count / maxClusterCount) * 100)}%`"></div>
+                </div>
+                <div class="text-xs text-prism-muted w-10 text-right" x-text="c.count"></div>
+              </div>
+            </template>
+            <div x-show="clusters.length === 0" class="text-prism-muted text-sm">No cluster data. Run pipeline first.</div>
+          </div>
+        </div>
+
+        <!-- Top rules summary -->
+        <div class="bg-prism-card border border-prism-border rounded-xl p-5">
+          <h2 class="text-sm font-semibold text-prism-muted mb-4">Top Association Rules</h2>
+          <div class="space-y-2">
+            <template x-for="r in rules.slice(0, 8)" :key="r.antecedents + r.consequents">
+              <div class="text-xs">
+                <div class="flex items-center gap-1 mb-0.5">
+                  <span class="bg-prism-gold/10 text-prism-gold px-1.5 py-0.5 rounded truncate max-w-[45%]" x-text="r.antecedents"></span>
+                  <span class="text-prism-muted">→</span>
+                  <span class="bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded truncate max-w-[45%]" x-text="r.consequents"></span>
+                </div>
+                <div class="text-prism-muted pl-1">
+                  lift <span class="text-prism-text font-mono" x-text="(r.lift || 0).toFixed(2)"></span>
+                  · conf <span class="text-prism-text font-mono" x-text="((r.confidence || 0) * 100).toFixed(0) + '%'"></span>
+                </div>
+              </div>
+            </template>
+            <div x-show="rules.length === 0" class="text-prism-muted text-sm">No rules. Run pipeline first.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Full rules table -->
+      <div class="bg-prism-card border border-prism-border rounded-xl p-5">
+        <h2 class="text-sm font-semibold text-prism-muted mb-4">All Association Rules (sorted by lift)</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="text-prism-muted border-b border-prism-border">
+                <th class="text-left py-2 pr-4">Antecedents</th>
+                <th class="text-left py-2 pr-4">Consequents</th>
+                <th class="text-right py-2 pr-4">Support</th>
+                <th class="text-right py-2 pr-4">Confidence</th>
+                <th class="text-right py-2">Lift</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="r in rules" :key="r.antecedents + r.consequents">
+                <tr class="border-b border-prism-border/40 hover:bg-white/2">
+                  <td class="py-1.5 pr-4 text-prism-gold truncate max-w-xs" x-text="r.antecedents"></td>
+                  <td class="py-1.5 pr-4 text-blue-400 truncate max-w-xs" x-text="r.consequents"></td>
+                  <td class="py-1.5 pr-4 text-right font-mono" x-text="(r.support || 0).toFixed(3)"></td>
+                  <td class="py-1.5 pr-4 text-right font-mono" x-text="((r.confidence || 0) * 100).toFixed(1) + '%'"></td>
+                  <td class="py-1.5 text-right font-mono text-green-400" x-text="(r.lift || 0).toFixed(2)"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHAT -->
+    <div x-show="page === 'chat'" class="h-screen flex flex-col p-6 max-w-4xl mx-auto">
+      <h1 class="text-2xl font-bold mb-4 shrink-0">LLM Chat</h1>
+      <p class="text-sm text-prism-muted mb-4 shrink-0">Ask questions about your product data, rankings, clusters, and model behavior.</p>
+
+      <!-- Messages -->
+      <div class="flex-1 overflow-y-auto space-y-4 mb-4 min-h-0" x-ref="chatBox">
+        <template x-for="msg in messages" :key="msg.id">
+          <div class="chat-bubble flex" :class="msg.role === 'user' ? 'justify-end' : 'justify-start'">
+            <div :class="msg.role === 'user'
+                  ? 'bg-prism-gold/20 border-prism-gold/30 text-prism-text ml-12'
+                  : 'bg-prism-card border-prism-border text-prism-text mr-12'"
+                 class="border rounded-2xl px-4 py-3 text-sm max-w-prose leading-relaxed whitespace-pre-wrap"
+                 x-text="msg.content">
+            </div>
+          </div>
+        </template>
+        <div x-show="streaming" class="flex justify-start">
+          <div class="bg-prism-card border border-prism-border rounded-2xl px-4 py-3 text-sm mr-12">
+            <span class="text-prism-muted" x-text="streamBuffer || '…'"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input -->
+      <div class="shrink-0 flex gap-3">
+        <input
+          x-model="chatInput"
+          @keydown.enter.prevent="sendChat()"
+          :disabled="streaming"
+          placeholder="Ask about your data…"
+          class="flex-1 bg-prism-card border border-prism-border rounded-xl px-4 py-3 text-sm text-prism-text placeholder-prism-muted focus:outline-none focus:border-prism-gold disabled:opacity-50 transition-colors"
+        />
+        <button
+          @click="sendChat()"
+          :disabled="streaming || !chatInput.trim()"
+          class="bg-prism-gold text-prism-bg font-semibold px-5 py-3 rounded-xl text-sm hover:bg-prism-gold/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+        >
+          <span x-text="streaming ? '…' : 'Send'"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- REPORTS -->
+    <div x-show="page === 'reports'" class="p-6 max-w-4xl mx-auto">
+      <h1 class="text-2xl font-bold mb-2">LLM Reports</h1>
+      <p class="text-sm text-prism-muted mb-8">AI-generated narrative intelligence over pipeline analytics.</p>
+
+      <div class="grid md:grid-cols-3 gap-4 mb-8">
+        <button @click="generateReport('executive')" :disabled="reportLoading"
+                class="bg-prism-card border border-prism-border hover:border-prism-gold rounded-xl p-5 text-left transition-all group disabled:opacity-50">
+          <div class="text-2xl mb-3">📋</div>
+          <div class="font-semibold mb-1 group-hover:text-prism-gold transition-colors">Executive Summary</div>
+          <div class="text-xs text-prism-muted">High-level business narrative across all products and categories.</div>
+        </button>
+        <button @click="generateReport('strategy')" :disabled="reportLoading"
+                class="bg-prism-card border border-prism-border hover:border-prism-gold rounded-xl p-5 text-left transition-all group disabled:opacity-50">
+          <div class="text-2xl mb-3">🎯</div>
+          <div class="font-semibold mb-1 group-hover:text-prism-gold transition-colors">Strategic Report</div>
+          <div class="text-xs text-prism-muted">Market positioning, pricing recommendations, and growth signals.</div>
+        </button>
+        <button @click="generateReport('profile')" :disabled="reportLoading"
+                class="bg-prism-card border border-prism-border hover:border-prism-gold rounded-xl p-5 text-left transition-all group disabled:opacity-50">
+          <div class="text-2xl mb-3">🏆</div>
+          <div class="font-semibold mb-1 group-hover:text-prism-gold transition-colors">Competitive Profile</div>
+          <div class="text-xs text-prism-muted">Deep-dive on top-5 products and competitive positioning.</div>
+        </button>
+      </div>
+
+      <div x-show="reportLoading" class="bg-prism-card border border-prism-border rounded-xl p-6 text-center">
+        <div class="text-prism-muted text-sm">Generating report with Gemini…</div>
+        <div class="mt-3 flex justify-center gap-1">
+          <div class="w-2 h-2 bg-prism-gold rounded-full animate-bounce" style="animation-delay:0ms"></div>
+          <div class="w-2 h-2 bg-prism-gold rounded-full animate-bounce" style="animation-delay:150ms"></div>
+          <div class="w-2 h-2 bg-prism-gold rounded-full animate-bounce" style="animation-delay:300ms"></div>
+        </div>
+      </div>
+
+      <div x-show="reportText && !reportLoading"
+           class="bg-prism-card border border-prism-border rounded-xl p-6">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs text-prism-muted" x-text="reportTitle"></span>
+          <button @click="reportText = ''" class="text-prism-muted hover:text-prism-text text-xs">✕ Clear</button>
+        </div>
+        <div class="text-sm leading-relaxed whitespace-pre-wrap" x-text="reportText"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    function prism() {
+      return {
+        page: 'dashboard',
+        tabs: [
+          { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+          { id: 'analytics', label: 'Analytics', icon: '🔍' },
+          { id: 'chat',      label: 'LLM Chat',  icon: '💬' },
+          { id: 'reports',   label: 'Reports',   icon: '📋' },
+        ],
+
+        // dashboard
+        stats: {},
+        topk: [],
+        topkFilter: '',
+
+        // analytics
+        clusters: [],
+        rules: [],
+
+        // chat
+        messages: [],
+        chatInput: '',
+        streaming: false,
+        streamBuffer: '',
+        msgId: 0,
+
+        // reports
+        reportText: '',
+        reportTitle: '',
+        reportLoading: false,
+
+        get filteredTopk() {
+          const q = this.topkFilter.toLowerCase();
+          return this.topk.filter(r =>
+            !q || r.title?.toLowerCase().includes(q) ||
+            r.shop_name?.toLowerCase().includes(q) ||
+            r.category?.toLowerCase().includes(q)
+          );
+        },
+
+        get maxClusterCount() {
+          return Math.max(...this.clusters.map(c => c.count), 1);
+        },
+
+        async init() {
+          await this.loadDashboard();
+        },
+
+        async loadDashboard() {
+          const [s, t] = await Promise.all([
+            fetch('/api/stats').then(r => r.json()).catch(() => ({})),
+            fetch('/api/topk').then(r => r.json()).catch(() => []),
+          ]);
+          this.stats = s;
+          this.topk = t;
+        },
+
+        async loadAnalytics() {
+          const [c, r] = await Promise.all([
+            fetch('/api/clusters').then(r => r.json()).catch(() => []),
+            fetch('/api/rules').then(r => r.json()).catch(() => []),
+          ]);
+          this.clusters = c;
+          this.rules = r;
+        },
+
+        async sendChat() {
+          const q = this.chatInput.trim();
+          if (!q || this.streaming) return;
+
+          this.messages.push({ id: ++this.msgId, role: 'user', content: q });
+          this.chatInput = '';
+          this.streaming = true;
+          this.streamBuffer = '';
+
+          await this.$nextTick();
+          this.$refs.chatBox?.scrollTo({ top: 999999, behavior: 'smooth' });
+
+          try {
+            const res = await fetch('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                query: q,
+                history: this.messages.slice(0, -1).map(m => ({ role: m.role, content: m.content }))
+              })
+            });
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buf = '';
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buf += decoder.decode(value, { stream: true });
+              const lines = buf.split('\n');
+              buf = lines.pop();
+              for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const payload = line.slice(6);
+                if (payload === '[DONE]') break;
+                try {
+                  const { token } = JSON.parse(payload);
+                  this.streamBuffer += token;
+                } catch {}
+              }
+              this.$refs.chatBox?.scrollTo({ top: 999999, behavior: 'smooth' });
+            }
+          } catch (e) {
+            this.streamBuffer = 'Error connecting to API.';
+          }
+
+          this.messages.push({ id: ++this.msgId, role: 'assistant', content: this.streamBuffer });
+          this.streaming = false;
+          this.streamBuffer = '';
+          await this.$nextTick();
+          this.$refs.chatBox?.scrollTo({ top: 999999, behavior: 'smooth' });
+        },
+
+        async generateReport(type) {
+          this.reportLoading = true;
+          this.reportText = '';
+          this.reportTitle = { executive: 'Executive Summary', strategy: 'Strategic Report', profile: 'Competitive Profile' }[type];
+          try {
+            const res = await fetch('/api/summary', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type })
+            });
+            const data = await res.json();
+            this.reportText = data.result || 'No result returned.';
+          } catch {
+            this.reportText = 'Error generating report.';
+          }
+          this.reportLoading = false;
+        }
+      };
+    }
+  </script>
+</body>
+</html>
