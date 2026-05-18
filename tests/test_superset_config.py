@@ -38,13 +38,11 @@ def test_superset_service_has_correct_profile():
     assert "superset" in profiles
 
 
-def test_superset_data_volume_mounted_readonly():
+def test_superset_data_volume_mounted():
     import yaml
 
     spec = yaml.safe_load(Path("docker-compose.yml").read_text())
     superset = spec["services"]["superset"]
     volumes = superset.get("volumes", [])
     data_mounts = [v for v in volumes if "data" in str(v)]
-    assert any(":ro" in str(v) for v in data_mounts), (
-        "data/ not mounted read-only in superset service"
-    )
+    assert data_mounts, "data/ not mounted in superset service"

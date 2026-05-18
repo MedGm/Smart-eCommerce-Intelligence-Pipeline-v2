@@ -1,4 +1,5 @@
 """Analytics REST endpoints — reads from warehouse.duckdb (read-only)."""
+
 from __future__ import annotations
 
 import json
@@ -60,10 +61,14 @@ def get_stats() -> dict:
 def get_topk() -> list[dict]:
     try:
         conn = _conn()
-        rows = conn.execute(
-            "SELECT title, shop_name, category, price, score "
-            "FROM topk_products ORDER BY score DESC LIMIT 50"
-        ).fetchdf().to_dict("records")
+        rows = (
+            conn.execute(
+                "SELECT title, shop_name, category, price, score "
+                "FROM topk_products ORDER BY score DESC LIMIT 50"
+            )
+            .fetchdf()
+            .to_dict("records")
+        )
         conn.close()
         return rows
     except Exception:
@@ -74,9 +79,13 @@ def get_topk() -> list[dict]:
 def get_clusters() -> list[dict]:
     try:
         conn = _conn()
-        rows = conn.execute(
-            "SELECT cluster, count(*) AS count FROM clusters GROUP BY cluster ORDER BY cluster"
-        ).fetchdf().to_dict("records")
+        rows = (
+            conn.execute(
+                "SELECT cluster, count(*) AS count FROM clusters GROUP BY cluster ORDER BY cluster"
+            )
+            .fetchdf()
+            .to_dict("records")
+        )
         conn.close()
         return rows
     except Exception:
@@ -87,10 +96,14 @@ def get_clusters() -> list[dict]:
 def get_rules() -> list[dict]:
     try:
         conn = _conn()
-        rows = conn.execute(
-            "SELECT antecedents, consequents, support, confidence, lift "
-            "FROM association_rules ORDER BY lift DESC LIMIT 30"
-        ).fetchdf().to_dict("records")
+        rows = (
+            conn.execute(
+                "SELECT antecedents, consequents, support, confidence, lift "
+                "FROM association_rules ORDER BY lift DESC LIMIT 30"
+            )
+            .fetchdf()
+            .to_dict("records")
+        )
         conn.close()
         return rows
     except Exception:

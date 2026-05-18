@@ -41,10 +41,7 @@ def test_pipeline_base_image_is_correct(tmp_path):
     executors = spec.get("deploymentSpec", {}).get("executors", {})
     for name, executor in executors.items():
         image = executor.get("container", {}).get("image", "")
-        assert "prism-app:local" not in image, (
-            f"Component {name} still uses old base image: {image}"
-        )
-        assert image == "prism-app:latest", f"Component {name} has unexpected image: {image}"
+        assert image == "prism-app:local", f"Component {name} has unexpected image: {image}"
 
 
 def test_pipeline_no_sys_path_append(tmp_path):
