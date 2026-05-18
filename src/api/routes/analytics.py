@@ -44,10 +44,15 @@ def get_stats() -> dict:
         pass
 
     metrics: dict = {}
-    for fname in ["model_metrics.json", "model_metrics_xgboost.json", "cluster_metrics.json"]:
+    for fname in ["model_metrics.json", "cluster_metrics.json"]:
         p = analytics_dir() / fname
         if p.exists():
             metrics.update(json.loads(p.read_text()))
+    xgb_path = analytics_dir() / "model_metrics_xgboost.json"
+    if xgb_path.exists():
+        xgb = json.loads(xgb_path.read_text())
+        metrics["f1_xgboost"] = xgb.get("f1")
+        metrics["accuracy_xgboost"] = xgb.get("accuracy")
 
     return {
         "n_products": n_products,

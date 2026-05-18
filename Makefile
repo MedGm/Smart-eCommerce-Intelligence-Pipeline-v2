@@ -22,7 +22,7 @@ DOCKER_RUN = docker compose run --rm app
         infra-up infra-down \
         superset-up superset-down \
         pipeline-full \
-        warehouse dbt-run dbt-test \
+        warehouse refresh dbt-run dbt-test \
         compile-kfp \
         clean
 
@@ -84,7 +84,14 @@ pipeline-full:
 
 # ── Data lake (Phase 1) ───────────────────────────────────────────────────────
 warehouse:
-	$(DOCKER_RUN) python -c "from src.storage.duckdb_client import load_products; load_products(); print('warehouse.duckdb ready')"
+	$(DOCKER_RUN) python -c "from src.storage.duckdb_client import rebuild_warehouse; rebuild_warehouse(); print('warehouse.duckdb ready')"
+
+# Sync MinIO analytics → local → rebuild warehouse (run after KFP finishes)
+refresh:
+	$(DOCKER_RUN) python -c "\
+from src.storage.duckdb_client import rebuild_warehouse; \
+rebuild_warehouse(); \
+print('Done. Restart Superset to pick up new data.')"
 
 dbt-run: warehouse
 	$(DOCKER_RUN) sh -c "cd dbt && dbt run --profiles-dir ."

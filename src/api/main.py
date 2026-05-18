@@ -1,4 +1,5 @@
 """PRISM FastAPI application — serves REST API + static SPA."""
+
 from pathlib import Path
 
 from fastapi import FastAPI

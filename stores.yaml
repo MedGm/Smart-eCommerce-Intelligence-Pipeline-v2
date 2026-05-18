@@ -25,8 +25,8 @@ shopify:
     collections: [all]
     max_collection_pages: 2
 
-  - url: https://www.skullcandy.com
-    name: Skullcandy
+  - url: https://nzxt.com
+    name: NZXT
     geography: US
     collections: [all]
     max_collection_pages: 2

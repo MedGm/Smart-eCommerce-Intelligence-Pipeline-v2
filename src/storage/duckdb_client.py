@@ -69,6 +69,88 @@ def load_products(source: str = "auto") -> pd.DataFrame:
         conn.close()
 
 
+def rebuild_warehouse() -> None:
+    """
+    Full warehouse rebuild: sync analytics CSVs from MinIO (if available),
+    then load all tables into warehouse.duckdb.
+
+    Tables created:
+      products           ← cleaned_products.parquet
+      topk_products      ← analytics/topk_products.csv
+      topk_per_category  ← analytics/topk_per_category.csv
+      topk_per_shop      ← analytics/topk_per_shop.csv
+      clusters           ← analytics/clusters.csv
+      association_rules  ← analytics/association_rules.csv
+    """
+    from src.config import analytics_dir
+
+    minio_configured = bool(os.environ.get("MINIO_ENDPOINT"))
+
+    # Sync analytics CSVs from MinIO → local
+    if minio_configured:
+        try:
+            from src.storage.minio_client import _client
+            c = _client()
+            a_dir = analytics_dir()
+            a_dir.mkdir(parents=True, exist_ok=True)
+            for fname in [
+                "topk_products.csv", "topk_per_category.csv", "topk_per_shop.csv",
+                "clusters.csv", "association_rules.csv",
+                "model_metrics.json", "model_metrics_xgboost.json", "cluster_metrics.json",
+            ]:
+                try:
+                    c.download_file("processed", f"analytics/{fname}", str(a_dir / fname))
+                    logger.info("Downloaded analytics/%s", fname)
+                except Exception as e:
+                    logger.warning("Could not download analytics/%s: %s", fname, e)
+            # Also sync cleaned parquet
+            p_dir = processed_dir()
+            p_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                c.download_file("processed", "cleaned_products.parquet",
+                                str(p_dir / "cleaned_products.parquet"))
+                logger.info("Downloaded cleaned_products.parquet")
+            except Exception as e:
+                logger.warning("Could not download cleaned_products.parquet: %s", e)
+        except Exception as e:
+            logger.warning("MinIO sync failed: %s", e)
+
+    a_dir = analytics_dir()
+    conn = _conn()
+    try:
+        # products table from parquet
+        parquet = processed_dir() / "cleaned_products.parquet"
+        if parquet.exists():
+            conn.execute(
+                f"CREATE OR REPLACE TABLE products AS SELECT * FROM read_parquet('{parquet}')"
+            )
+            logger.info("Loaded products (%d rows)", conn.execute("SELECT count(*) FROM products").fetchone()[0])
+
+        # Analytics CSV tables
+        csv_tables = [
+            ("topk_products",     "topk_products.csv"),
+            ("topk_per_category", "topk_per_category.csv"),
+            ("topk_per_shop",     "topk_per_shop.csv"),
+            ("clusters",          "clusters.csv"),
+            ("association_rules", "association_rules.csv"),
+        ]
+        for table, fname in csv_tables:
+            path = a_dir / fname
+            if path.exists():
+                conn.execute(
+                    f"CREATE OR REPLACE TABLE {table} AS SELECT * FROM read_csv_auto('{path}')"
+                )
+                n = conn.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
+                logger.info("Loaded %s (%d rows)", table, n)
+            else:
+                logger.warning("Missing %s — table %s skipped", fname, table)
+
+        _warehouse_path().chmod(0o666)
+        logger.info("Warehouse rebuilt: %s", _warehouse_path())
+    finally:
+        conn.close()
+
+
 def query(sql: str, duckdb_path: str | None = None) -> pd.DataFrame:
     """Run arbitrary SQL against warehouse.duckdb and return as DataFrame."""
     conn = _conn(duckdb_path)
